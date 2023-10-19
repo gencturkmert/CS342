@@ -138,18 +138,49 @@ void processFile(const char *filename, mqd_t mq, int M)
 
 int main(int argc, char *argv[])
 {
-    if (argc != 5)
+    int N = 5; // Default value for N
+    int M = 3; // Default value for M
+    const char *inputfile = NULL;
+    const char *outputfile = NULL;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "n:m:i:o:")) != -1)
     {
-        printf("Usage: %s N M inputfile outputfile\n", argv[0]);
-        exit(EXIT_FAILURE);
+        switch (opt)
+        {
+        case 'n':
+            N = atoi(optarg);
+            if (N < 1 || N > 20)
+            {
+                printf("N must be between 1 and 20.\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        case 'm':
+            M = atoi(optarg);
+            if (M < 1 || M > 20)
+            {
+                printf("M must be between 1 and 20.\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        case 'i':
+            inputfile = optarg;
+            break;
+        case 'o':
+            outputfile = optarg;
+            break;
+        default:
+            printf("Usage: %s [-n N] [-m M] -i INFILE -o OUTFILE\n", argv[0]);
+            exit(EXIT_FAILURE);
+        }
     }
 
-    clock_t start_time = clock();
-
-    int N = atoi(argv[1]);
-    int M = atoi(argv[2]);
-    const char *inputfile = argv[3];
-    const char *outputfile = argv[4];
+    if (inputfile == NULL || outputfile == NULL)
+    {
+        printf("Input and output file must be provided.\n");
+        exit(EXIT_FAILURE);
+    }
 
     // Divide input file
     char fileList[50][50];
