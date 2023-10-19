@@ -3,28 +3,26 @@
 
 struct Node
 {
-    void *data;
+    int data;
     struct Node *next;
 };
 
 struct LinkedList
 {
     struct Node *head;
-    size_t size;
+    int size;
 };
 
 void initializeLinkedList(struct LinkedList *list);
 
-void addNode(struct LinkedList *list, void *data);
+void addNode(struct LinkedList *list, int data);
+
+struct Node *createNode(int data);
 
 void freeList(struct LinkedList *list);
 
-void addIntNode(struct LinkedList *list, int value);
-
-void addStringNode(struct LinkedList *list, const char *value);
 
 int getInt(struct LinkedList *list, int index);
 
-const char *getString(struct LinkedList *list, int index);
 
 #endif

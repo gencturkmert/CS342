@@ -8,6 +8,9 @@
 #include <time.h>
 #include <mqueue.h>
 #include "LinkedList.h"
+#include <string.h>
+#include <errno.h>
+
 
 #define MAX_INT_PER_MESSAGE 21
 #define MAX_PRIME_ARRAY_SIZE 21
@@ -39,83 +42,26 @@ int isPrime(int num)
     return 1;
 }
 
-void divideInput(const char *inputfile, int N, struct LinkedList *fileList)
-{
-    FILE *input = fopen(inputfile, "r");
-    if (input == NULL)
-    {
-        perror("Error opening input file");
-        exit(EXIT_FAILURE);
-    }
-
-    struct LinkedList *valueList;
-
-    int num;
-    while (fscanf(input, "%d", &num) == 1)
-    {
-        addIntNode(&valueList, num);
-    }
-
-    fclose(input);
-
-    int portion_size = valueList->size / N;
-
-    struct Node *current = valueList->head;
-    for (int i = 0; i < N; ++i)
-    {
-        char *filename == NULL;
-        if (asprintf(&filename, "tempfile%d.txt", i) == -1)
-        {
-            perror("Memory allocation failed for  file: %d \n", i);
-            exit(EXIT_FAILURE);
-        }
-
-        addStringNode(&fileList, filename);
-
-        FILE *intermediateFile = fopen(filename, "w");
-        if (intermediateFile == NULL)
-        {
-            perror("Error opening intermediate file %d", i);
-            exit(EXIT_FAILURE);
-        }
-
-        for (int j = 0; j < portion_size; ++j)
-        {
-            if (current != NULL)
-            {
-                fprintf(intermediateFile, "%d\n", num);
-                current = current->next;
-            }
-        }
-
-        if (i == N - 1)
-        {
-            while (current != NULL)
-            {
-                num = *((int *)(current->data))
-                          fprintf(intermediateFile, "%d\n", num);
-                current = current->next;
-            }
-        }
-
-        fclose(intermediateFile);
-    }
-
-    freeList(valueList);
-}
 
 void processFile(const char *filename, mqd_t mq, int M)
 {
     FILE *file = fopen(filename, "r");
     if (file == NULL)
     {
-        perror("Error opening file");
+        printf("Error opening intermediate file:");
+        printf("%s",filename);
+        printf("\n");
         exit(EXIT_FAILURE);
     }
 
     struct msg_buffer msg;
     int num;
     int prime_array[MAX_PRIME_ARRAY_SIZE];
+
+    for( int i = 0; i<MAX_PRIME_ARRAY_SIZE;i++) {
+        prime_array[i] = -1;
+    }
+
     int prime_count = 0;
 
     while (fscanf(file, "%d", &num) == 1)
@@ -135,19 +81,18 @@ void processFile(const char *filename, mqd_t mq, int M)
                 msg.is_termination = 0; // Normal message, not termination
                 if (mq_send(mq, (const char *)&msg, MESSAGE_SIZE, 0) == -1)
                 {
-                    perror("Error sending message");
+                    printf("Error sending message");
                     exit(EXIT_FAILURE);
                 }
-                else
-                {
-                    printf("Message sent from child\n");
-                }
+              
+                printf("Message sent from child\n");
+                
 
                 prime_count = 0;
 
                 for (int i = 0; i < M; i++)
                 {
-                    prime_array[i] = 0;
+                    prime_array[i] = -1;
                 }
             }
         }
@@ -161,10 +106,14 @@ void processFile(const char *filename, mqd_t mq, int M)
             msg.data[i] = prime_array[i];
         }
 
+        for(int i = prime_count; i<M;i++) {
+            msg.data[i] = -1;
+        }
+
         msg.is_termination = 0; // Normal message, not termination
         if (mq_send(mq, (const char *)&msg, MESSAGE_SIZE, 0) == -1)
         {
-            perror("Error sending message");
+            printf("Error sending message");
             exit(EXIT_FAILURE);
         }
     }
@@ -176,19 +125,19 @@ void processFile(const char *filename, mqd_t mq, int M)
     msg.is_termination = 1; // Termination message
     if (mq_send(mq, (const char *)&msg, MESSAGE_SIZE, 0) == -1)
     {
-        perror("Error sending termination message");
+        printf("Error sending termination message");
         exit(EXIT_FAILURE);
     }
 
     if (remove(filename) != 0)
     {
-        perror("Error deleting intermediate file %s \n", filename);
+        printf("Error deleting intermediate file %s \n", filename);
     }
 }
 
 int main(int argc, char *argv[])
 {
-    if (argc != 6)
+    if (argc != 5)
     {
         printf("Usage: %s N M inputfile outputfile\n", argv[0]);
         exit(EXIT_FAILURE);
@@ -201,10 +150,73 @@ int main(int argc, char *argv[])
     const char *inputfile = argv[3];
     const char *outputfile = argv[4];
 
+
     // Divide input file to intermediate files
-    struct LinkedList interFileList;
-    initializeLinkedList(&interFileList); // Corrected the function call
-    divideInput(inputfile, N, &interFileList);
+    char  fileList[50][50];
+
+    //Divide Input
+    FILE *input = fopen(inputfile, "r");
+    if (input == NULL)
+    {
+        perror("Error opening input file");
+        exit(EXIT_FAILURE);
+    }
+
+    struct LinkedList valueList;
+    initializeLinkedList(&valueList);
+
+    int num;
+    while (fscanf(input, "%d", &num) == 1)
+    {
+        addNode(&valueList, num);
+    }
+
+    fclose(input);
+
+    int portion_size = valueList.size / N;
+
+    struct Node *current = valueList.head;
+    for (int i = 0; i < N; ++i)
+    {
+        char filename[50];
+        sprintf(filename, "tempfile%d.txt", i);
+ 
+         strcpy(fileList[i], filename);
+
+        FILE *intermediateFile = fopen(filename, "w");
+        if (intermediateFile == NULL)
+        {
+            printf("Error opening intermediate file %d\n", i);
+            exit(EXIT_FAILURE);
+        }
+
+        for (int j = 0; j < portion_size; ++j)
+        {
+            if (current != NULL)
+            {
+                
+                fprintf(intermediateFile, "%d\n", current->data);
+                current = current->next;
+            }
+        }
+
+        if (i == N - 1)
+        {
+            while (current != NULL)
+            {
+                num = current->data;
+                fprintf(intermediateFile, "%d\n", num);
+                current = current->next;
+            }
+        }
+
+        fclose(intermediateFile);
+    }
+
+    freeList(&valueList);
+
+    //Divide Input ends
+    printf("\n INPUT DIVIDED SUCCESFULLY\n");
 
     // Create message queue
     struct mq_attr attr;
@@ -213,7 +225,7 @@ int main(int argc, char *argv[])
     attr.mq_msgsize = MESSAGE_SIZE;
     attr.mq_curmsgs = 0;
 
-    mq = mq_open(MESSAGE_QUEUE_NAME, O_CREAT | O_RDONLY, 0666, &attr);
+    mq = mq_open(MESSAGE_QUEUE_NAME, O_CREAT | O_RDWR, 0666, &attr);
     if (mq == (mqd_t)-1)
     {
         perror("Error creating message queue");
@@ -242,12 +254,14 @@ int main(int argc, char *argv[])
         if (pid == 0)
         {
             // Child process
-            processFile(getString(&interFileList, i), mq, M);
+            printf("child process created\n");
+            processFile(fileList[i], mq, M);
             exit(EXIT_SUCCESS);
         }
     }
 
     struct msg_buffer msg;
+    int counter = 0;
     while (counter < N)
     {
         mq_receive(mq, (char *)&msg, MESSAGE_SIZE, NULL);
@@ -255,13 +269,17 @@ int main(int argc, char *argv[])
         if (msg.is_termination)
         {
             counter++;
+            printf("A child terminated");
         }
         else
         {
-            printf("Received message from child: ");
-            for (int i = 0; i < MAX_MESSAGES; ++i)
+            printf("Received message from child");
+            for (int i = 0; i < M; ++i)
             {
-                fprintf(output, "%d/n ", msg.data[i]);
+                if(msg.data[i]>0 ) {
+                printf("mesaj data %d: %d\n",i,msg.data[i]);
+                fprintf(output, "%d\n", msg.data[i]);
+                }
             }
             printf("\n");
         }
@@ -271,8 +289,6 @@ int main(int argc, char *argv[])
     printf("Received %d termination messages. Parent is terminating.\n", N);
 
     fclose(output);
-
-    freeList(&interFileList);
 
     if (mq_close(mq) == -1)
     {
