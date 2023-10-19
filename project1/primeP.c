@@ -53,7 +53,7 @@ void divideInput(const char *inputfile, int N, struct LinkedList *fileList)
     int num;
     while (fscanf(input, "%d", &num) == 1)
     {
-        addIntNode(valueList, num);
+        addIntNode(&valueList, num);
     }
 
     fclose(input);
@@ -70,7 +70,7 @@ void divideInput(const char *inputfile, int N, struct LinkedList *fileList)
             exit(EXIT_FAILURE);
         }
 
-        addStringNode(fileList, filename);
+        addStringNode(&fileList, filename);
 
         FILE *intermediateFile = fopen(filename, "w");
         if (intermediateFile == NULL)
@@ -190,7 +190,7 @@ int main(int argc, char *argv[])
 {
     if (argc != 6)
     {
-        fprintf(stderr, "Usage: %s N M inputfile outputfile\n", argv[0]);
+        printf("Usage: %s N M inputfile outputfile\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -261,7 +261,7 @@ int main(int argc, char *argv[])
             printf("Received message from child: ");
             for (int i = 0; i < MAX_MESSAGES; ++i)
             {
-                printf("%d ", msg.data[i]);
+                fprintf(output, "%d/n ", msg.data[i]);
             }
             printf("\n");
         }
