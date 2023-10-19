@@ -11,7 +11,6 @@
 #include <string.h>
 #include <errno.h>
 
-
 #define MAX_INT_PER_MESSAGE 21
 #define MAX_PRIME_ARRAY_SIZE 21
 #define MESSAGE_SIZE sizeof(struct msg_buffer)
@@ -21,7 +20,7 @@ struct msg_buffer
 {
     long msg_type;
     int data[MAX_INT_PER_MESSAGE];
-    int is_termination; // Added to indicate termination
+    int is_termination;
 };
 
 mqd_t mq;
@@ -42,14 +41,13 @@ int isPrime(int num)
     return 1;
 }
 
-
 void processFile(const char *filename, mqd_t mq, int M)
 {
     FILE *file = fopen(filename, "r");
     if (file == NULL)
     {
         printf("Error opening intermediate file:");
-        printf("%s",filename);
+        printf("%s", filename);
         printf("\n");
         exit(EXIT_FAILURE);
     }
@@ -58,7 +56,8 @@ void processFile(const char *filename, mqd_t mq, int M)
     int num;
     int prime_array[MAX_PRIME_ARRAY_SIZE];
 
-    for( int i = 0; i<MAX_PRIME_ARRAY_SIZE;i++) {
+    for (int i = 0; i < MAX_PRIME_ARRAY_SIZE; i++)
+    {
         prime_array[i] = -1;
     }
 
@@ -84,9 +83,8 @@ void processFile(const char *filename, mqd_t mq, int M)
                     printf("Error sending message");
                     exit(EXIT_FAILURE);
                 }
-              
+
                 printf("Message sent from child\n");
-                
 
                 prime_count = 0;
 
@@ -106,7 +104,8 @@ void processFile(const char *filename, mqd_t mq, int M)
             msg.data[i] = prime_array[i];
         }
 
-        for(int i = prime_count; i<M;i++) {
+        for (int i = prime_count; i < M; i++)
+        {
             msg.data[i] = -1;
         }
 
@@ -129,6 +128,8 @@ void processFile(const char *filename, mqd_t mq, int M)
         exit(EXIT_FAILURE);
     }
 
+    printf("Termination message sent from child");
+
     if (remove(filename) != 0)
     {
         printf("Error deleting intermediate file %s \n", filename);
@@ -150,11 +151,9 @@ int main(int argc, char *argv[])
     const char *inputfile = argv[3];
     const char *outputfile = argv[4];
 
+    // Divide input file
+    char fileList[50][50];
 
-    // Divide input file to intermediate files
-    char  fileList[50][50];
-
-    //Divide Input
     FILE *input = fopen(inputfile, "r");
     if (input == NULL)
     {
@@ -180,8 +179,8 @@ int main(int argc, char *argv[])
     {
         char filename[50];
         sprintf(filename, "tempfile%d.txt", i);
- 
-         strcpy(fileList[i], filename);
+
+        strcpy(fileList[i], filename);
 
         FILE *intermediateFile = fopen(filename, "w");
         if (intermediateFile == NULL)
@@ -194,7 +193,7 @@ int main(int argc, char *argv[])
         {
             if (current != NULL)
             {
-                
+
                 fprintf(intermediateFile, "%d\n", current->data);
                 current = current->next;
             }
@@ -215,8 +214,7 @@ int main(int argc, char *argv[])
 
     freeList(&valueList);
 
-    //Divide Input ends
-    printf("\n INPUT DIVIDED SUCCESFULLY\n");
+    // Divide Input ends
 
     // Create message queue
     struct mq_attr attr;
@@ -269,16 +267,16 @@ int main(int argc, char *argv[])
         if (msg.is_termination)
         {
             counter++;
-            printf("A child terminated");
+            printf("A child terminatation message received");
         }
         else
         {
             printf("Received message from child");
             for (int i = 0; i < M; ++i)
             {
-                if(msg.data[i]>0 ) {
-                printf("mesaj data %d: %d\n",i,msg.data[i]);
-                fprintf(output, "%d\n", msg.data[i]);
+                if (msg.data[i] > 0)
+                {
+                    fprintf(output, "%d\n", msg.data[i]);
                 }
             }
             printf("\n");
