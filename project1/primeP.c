@@ -7,7 +7,6 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <mqueue.h>
-#include "LinkedList.h"
 #include <string.h>
 
 #define MAX_INT_PER_MESSAGE 21
@@ -193,20 +192,16 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    struct LinkedList valueList;
-    initializeLinkedList(&valueList);
+    fseek(file, 0, SEEK_END);
 
-    int num;
-    while (fscanf(input, "%d", &num) == 1)
-    {
-        addNode(&valueList, num);
-    }
+    int file_length = ftell(file);
+
+    fseek(file, 0, SEEK_SET);
 
     fclose(input);
 
-    int portion_size = valueList.size / N;
-
-    struct Node *current = valueList.head;
+    int portion_size = file_length / N;
+    int num;
     for (int i = 0; i < N; ++i)
     {
         char filename[50];
@@ -223,28 +218,22 @@ int main(int argc, char *argv[])
 
         for (int j = 0; j < portion_size; ++j)
         {
-            if (current != NULL)
+            if (fscanf(input, "%d", &num) == 1)
             {
-
-                fprintf(intermediateFile, "%d\n", current->data);
-                current = current->next;
+                fprintf(intermediateFile, "%d\n", num);
             }
         }
 
         if (i == N - 1)
         {
-            while (current != NULL)
+            while (fscanf(input, "%d", &num) == 1)
             {
-                num = current->data;
                 fprintf(intermediateFile, "%d\n", num);
-                current = current->next;
             }
         }
 
         fclose(intermediateFile);
     }
-
-    freeList(&valueList);
 
     // input divided
 
