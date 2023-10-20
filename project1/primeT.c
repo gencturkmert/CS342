@@ -4,6 +4,8 @@
 #include <pthread.h>
 #include <time.h>
 #include "LinkedList.h"
+#include <string.h>
+
 
 #define MAX_INT_PER_MESSAGE 21
 #define MAX_PRIME_ARRAY_SIZE 21
@@ -14,7 +16,7 @@ int N;
 int M;
 const char *inputfile;
 const char *outputfile;
-LinkedList primeLists[MAX_THREADS];
+struct LinkedList primeLists[MAX_THREADS];
 char fileList[20][50];
 
 int isPrime(int num)
@@ -42,7 +44,7 @@ void *processFile(void *arg)
     FILE *file = fopen(thrFile, "r");
     if (file == NULL)
     {
-        perror("Error opening intermediate file %d\n", thread_id);
+        printf("Error opening intermediate file %d\n", thread_id);
         exit(EXIT_FAILURE);
     }
 
@@ -88,12 +90,15 @@ int main(int argc, char *argv[])
         }
     }
 
+    clock_t start_time = clock();
+
+
     // Divide input file
 
     FILE *input = fopen(inputfile, "r");
     if (input == NULL)
     {
-        perror("Error opening input file");
+        printf("Error opening input file");
         exit(EXIT_FAILURE);
     }
 
@@ -164,7 +169,7 @@ int main(int argc, char *argv[])
         thread_ids[i] = i;
         if (pthread_create(&threads[i], NULL, processFile, &thread_ids[i]) != 0)
         {
-            perror("Error creating thread");
+            printf("Error creating thread");
             exit(EXIT_FAILURE);
         }
     }
@@ -174,7 +179,7 @@ int main(int argc, char *argv[])
     {
         if (pthread_join(threads[i], NULL) != 0)
         {
-            perror("Error joining thread");
+            printf("Error joining thread");
             exit(EXIT_FAILURE);
         }
     }
@@ -183,14 +188,14 @@ int main(int argc, char *argv[])
     FILE *output = fopen(outputfile, "w");
     if (output == NULL)
     {
-        perror("Error opening output file");
+        printf("Error opening output file");
         exit(EXIT_FAILURE);
     }
 
     // Consolidate and print prime numbers
     for (int i = 0; i < N; i++)
     {
-        Node *current = primeLists[i].head;
+        struct Node *current = primeLists[i].head;
         while (current != NULL)
         {
             fprintf(output, "%d\n", current->data);

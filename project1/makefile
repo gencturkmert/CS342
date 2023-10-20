@@ -1,16 +1,15 @@
 CC = gcc
-CFLAGS = -g
+CFLAGS = -Wall -Werror
 
-all: primeP
+all: primeP primeT
 
-primeP: primeP.o LinkedList.o
-	$(CC) $(CFLAGS) -o primeP primeP.o LinkedList.o
+primeP: LinkedList.c primeP.c
+	$(CC) $(CFLAGS) -o primeP LinkedList.c primeP.c
 
-primeP.o: primeP.c LinkedList.h
-	$(CC) $(CFLAGS) -c primeP.c
-
-LinkedList.o: LinkedList.c LinkedList.h
-	$(CC) $(CFLAGS) -c LinkedList.c
+primeT: LinkedList.c primeT.c
+	$(CC) $(CFLAGS) -o primeT LinkedList.c primeT.c
 
 clean:
-	rm -f primeP primeP.o LinkedList.o
+	rm -f primeP primeT
+
+.PHONY: all clean

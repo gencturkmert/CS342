@@ -9,7 +9,6 @@
 #include <mqueue.h>
 #include "LinkedList.h"
 #include <string.h>
-#include <errno.h>
 
 #define MAX_INT_PER_MESSAGE 21
 #define MAX_PRIME_ARRAY_SIZE 21
@@ -181,6 +180,8 @@ int main(int argc, char *argv[])
         printf("Input and output file must be provided.\n");
         exit(EXIT_FAILURE);
     }
+
+    clock_t start_time = clock();
 
     // Divide input file
     char fileList[50][50];
