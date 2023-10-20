@@ -76,7 +76,7 @@ void processFile(const char *filename, mqd_t mq, int M)
                     msg.data[i] = prime_array[i];
                 }
 
-                msg.is_termination = 0; // Normal message, not termination
+                msg.is_termination = 0;
                 if (mq_send(mq, (const char *)&msg, MESSAGE_SIZE, 0) == -1)
                 {
                     printf("Error sending message");
@@ -108,7 +108,7 @@ void processFile(const char *filename, mqd_t mq, int M)
             msg.data[i] = -1;
         }
 
-        msg.is_termination = 0; // Normal message, not termination
+        msg.is_termination = 0;
         if (mq_send(mq, (const char *)&msg, MESSAGE_SIZE, 0) == -1)
         {
             printf("Error sending message");
@@ -118,9 +118,9 @@ void processFile(const char *filename, mqd_t mq, int M)
 
     fclose(file);
 
-    // Send termination message after closing the file
+    // Send termination message
     msg.msg_type = getpid();
-    msg.is_termination = 1; // Termination message
+    msg.is_termination = 1;
     if (mq_send(mq, (const char *)&msg, MESSAGE_SIZE, 0) == -1)
     {
         printf("Error sending termination message");
@@ -137,8 +137,8 @@ void processFile(const char *filename, mqd_t mq, int M)
 
 int main(int argc, char *argv[])
 {
-    int N = 5; // Default value for N
-    int M = 3; // Default value for M
+    int N = 5;
+    int M = 3;
     const char *inputfile = NULL;
     const char *outputfile = NULL;
 
@@ -246,23 +246,22 @@ int main(int argc, char *argv[])
 
     freeList(&valueList);
 
-    // Divide Input ends
+    // input divided
 
-    // Create message queue
+    // mq
     struct mq_attr attr;
     attr.mq_flags = 0;
     attr.mq_maxmsg = 10;
     attr.mq_msgsize = MESSAGE_SIZE;
     attr.mq_curmsgs = 0;
 
-    mq = mq_open(MESSAGE_QUEUE_NAME, O_CREAT | O_RDWR, 0666, &attr);
+    mq = mq_open(MESSAGE_QUEUE_NAME, O_CREAT | O_RDWR, 0666, &attr); // RDWR -> write & read
     if (mq == (mqd_t)-1)
     {
         perror("Error creating message queue");
         exit(EXIT_FAILURE);
     }
 
-    // Opening output file
     FILE *output = fopen(outputfile, "w");
     if (output == NULL)
     {
@@ -270,7 +269,6 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    // Create child processes for each intermediate file
     for (int i = 0; i < N; ++i)
     {
         pid_t pid = fork();
@@ -283,8 +281,7 @@ int main(int argc, char *argv[])
 
         if (pid == 0)
         {
-            // Child process
-            printf("child process created\n");
+            printf("child process %d created\n", i);
             processFile(fileList[i], mq, M);
             exit(EXIT_SUCCESS);
         }
@@ -315,7 +312,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Parent terminates after receiving N termination messages
     printf("Received %d termination messages. Parent is terminating.\n", N);
 
     fclose(output);

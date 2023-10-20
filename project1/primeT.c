@@ -6,7 +6,6 @@
 #include "LinkedList.h"
 #include <string.h>
 
-
 #define MAX_INT_PER_MESSAGE 21
 #define MAX_PRIME_ARRAY_SIZE 21
 
@@ -64,7 +63,6 @@ void *processFile(void *arg)
 int main(int argc, char *argv[])
 {
 
-    // Parse command-line arguments
     int opt;
     while ((opt = getopt(argc, argv, "n:i:o:")) != -1)
     {
@@ -91,7 +89,6 @@ int main(int argc, char *argv[])
     }
 
     clock_t start_time = clock();
-
 
     // Divide input file
 
@@ -155,7 +152,7 @@ int main(int argc, char *argv[])
 
     freeList(&valueList);
 
-    // Divide input ends
+    // input divided
 
     for (int i = 0; i < N; i++)
     {
@@ -174,7 +171,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Wait for worker threads to finish
     for (int i = 0; i < N; i++)
     {
         if (pthread_join(threads[i], NULL) != 0)
@@ -184,7 +180,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Opening output file
     FILE *output = fopen(outputfile, "w");
     if (output == NULL)
     {
@@ -192,7 +187,6 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    // Consolidate and print prime numbers
     for (int i = 0; i < N; i++)
     {
         struct Node *current = primeLists[i].head;
