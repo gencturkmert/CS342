@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
 
     clock_t end_time = clock();
     double elapsed_time = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
-    printf("Total time taken: %.2f seconds\n", elapsed_time);
+    printf("Total time taken: %.6f seconds\n", elapsed_time);
 
     return 0;
 }
