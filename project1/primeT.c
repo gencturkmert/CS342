@@ -91,23 +91,28 @@ int main(int argc, char *argv[])
     clock_t start_time = clock();
 
     // Divide input file
+
     FILE *input = fopen(inputfile, "r");
     if (input == NULL)
     {
-        perror("Error opening input file");
+        printf("Error opening input file");
         exit(EXIT_FAILURE);
     }
 
-    fseek(file, 0, SEEK_END);
+    struct LinkedList valueList;
+    initializeLinkedList(&valueList);
 
-    int file_length = ftell(file);
-
-    fseek(file, 0, SEEK_SET);
+    int num;
+    while (fscanf(input, "%d", &num) == 1)
+    {
+        addNode(&valueList, num);
+    }
 
     fclose(input);
 
-    int portion_size = file_length / N;
-    int num;
+    int portion_size = valueList.size / N;
+
+    struct Node *current = valueList.head;
     for (int i = 0; i < N; ++i)
     {
         char filename[50];
@@ -124,22 +129,28 @@ int main(int argc, char *argv[])
 
         for (int j = 0; j < portion_size; ++j)
         {
-            if (fscanf(input, "%d", &num) == 1)
+            if (current != NULL)
             {
-                fprintf(intermediateFile, "%d\n", num);
+
+                fprintf(intermediateFile, "%d\n", current->data);
+                current = current->next;
             }
         }
 
         if (i == N - 1)
         {
-            while (fscanf(input, "%d", &num) == 1)
+            while (current != NULL)
             {
+                num = current->data;
                 fprintf(intermediateFile, "%d\n", num);
+                current = current->next;
             }
         }
 
         fclose(intermediateFile);
     }
+
+    freeList(&valueList);
 
     // input divided
 
