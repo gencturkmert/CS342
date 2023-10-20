@@ -83,8 +83,6 @@ void processFile(const char *filename, mqd_t mq, int M)
                     exit(EXIT_FAILURE);
                 }
 
-                printf("Message sent from child\n");
-
                 prime_count = 0;
 
                 for (int i = 0; i < M; i++)
@@ -281,7 +279,6 @@ int main(int argc, char *argv[])
 
         if (pid == 0)
         {
-            printf("child process %d created\n", i);
             processFile(fileList[i], mq, M);
             exit(EXIT_SUCCESS);
         }
@@ -300,7 +297,6 @@ int main(int argc, char *argv[])
         }
         else
         {
-            printf("Received message from child\n");
             for (int i = 0; i < M; ++i)
             {
                 if (msg.data[i] > 0)
