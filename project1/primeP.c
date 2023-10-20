@@ -127,7 +127,7 @@ void processFile(const char *filename, mqd_t mq, int M)
         exit(EXIT_FAILURE);
     }
 
-    printf("Termination message sent from child");
+    printf("Termination message sent from child \n");
 
     if (remove(filename) != 0)
     {
@@ -299,11 +299,11 @@ int main(int argc, char *argv[])
         if (msg.is_termination)
         {
             counter++;
-            printf("A child terminatation message received");
+            printf("A child terminatation message been received\n");
         }
         else
         {
-            printf("Received message from child");
+            printf("Received message from child\n");
             for (int i = 0; i < M; ++i)
             {
                 if (msg.data[i] > 0)
