@@ -1,7 +1,7 @@
 Repository for Bilkent CS342 Operating Systems Course.
 
-Includes:
-  Homework Reports
-  Projects
-  Example Source Code
+ <bold> Includes: </bold> <br>
+  Homework Reports <br>
+  Projects <br>
+  Example Source Code <br>
   Course Materials
