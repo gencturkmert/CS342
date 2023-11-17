@@ -4,20 +4,64 @@
 #include <mqueue.h>
 #include <pthread.h>
 #include "shared_defs.h"
+#include <fcntl.h>
 
 #define MAX_THREADS 10
 #define REQUEST_BUFFER_SIZE 256
 
 // Global variables
 mqd_t mq1, mq2;
-pthread_t clientThreads[MAX_THREADS];
-pthread_mutex_t file_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t file_cond = PTHREAD_COND_INITIALIZER;
-int current_line = 0;
+pthread_cond_t response_cond[MAX_THREADS];
 char fname[256];
+int vsize;
+FILE *filePointers[MAX_CLIENTS];
 
-// Function prototypes
-void *clientWorker(void *arg);
+void *clientWorker(void *arg)
+{
+    int thread_id = *((int *)arg);
+
+    while (1)
+    {
+        char requestBuffer[REQUEST_BUFFER_SIZE];
+
+        // Use thread-specific file
+        if (fgets(requestBuffer, REQUEST_BUFFER_SIZE, filePointers[thread_id]) == NULL)
+        {
+            pthread_exit(NULL);
+        }
+
+        Message requestMessage;
+
+        if (mq_send(mq1, (const char *)&requestMessage, sizeof(Message), 0) == -1)
+        {
+            perror("Error sending request message to MQ1");
+            exit(EXIT_FAILURE);
+        }
+
+        pthread_cond_wait(&response_cond[thread_id], NULL);
+    }
+
+    pthread_exit(NULL);
+}
+
+void *frontend(void *arg)
+{
+    while (1)
+    {
+        // Receive messages from MQ2 and wake up the corresponding thread
+        Message responseMessage;
+        if (mq_receive(mq2, (char *)&responseMessage, sizeof(Message), NULL) > 0)
+        {
+            // Extract the thread ID from the response message
+            int thread_id = /* Extract thread ID from the responseMessage */;
+
+            // Signal or broadcast to wake up the corresponding thread
+            pthread_cond_signal(&response_cond[thread_id]);
+        }
+    }
+
+    pthread_exit(NULL);
+}
 
 int main(int argc, char *argv[])
 {
@@ -74,10 +118,16 @@ int main(int argc, char *argv[])
     printf("dlevel: %d\n", dlevel);
 
     // Append 1 and 2 to mqname for MQ1 and MQ2
-    char mqname1[256], mqname2[256];
-    snprintf(mqname1, sizeof(mqname1), "%s1", mqname);
-    snprintf(mqname2, sizeof(mqname2), "%s2", mqname);
+    pthread_cond_t response_cond[MAX_THREADS];
+    for (int i = 0; i < clicount; ++i)
+    {
+        pthread_cond_init(&response_cond[i], NULL);
+    }
 
+    char mqname1[256], mqname2[256];
+
+    snprintf(mqname1, sizeof(mqname1), "/%s1", mqname);
+    snprintf(mqname2, sizeof(mqname2), "/%s2", mqname);
     // Open MQ1 and MQ2
     mq1 = mq_open(mqname1, O_WRONLY);
     mq2 = mq_open(mqname2, O_RDONLY);
@@ -87,16 +137,40 @@ int main(int argc, char *argv[])
         perror("Error opening message queues");
         exit(EXIT_FAILURE);
     }
-
-    // Initialize and create client threads
     for (int i = 0; i < clicount; ++i)
     {
-        if (pthread_create(&clientThreads[i], NULL, clientWorker, NULL) != 0)
+        char filename[256];
+        snprintf(filename, sizeof(filename), "%s%d", fname, i + 1);
+
+        filePointers[i] = fopen(filename, "r");
+        if (filePointers[i] == NULL)
+        {
+            fprintf(stderr, "Failed to open file: %s\n", filename);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Create frontend thread
+    pthread_t frontendThread;
+    if (pthread_create(&frontendThread, NULL, frontend, NULL) != 0)
+    {
+        perror("Error creating frontend thread");
+        exit(EXIT_FAILURE);
+    }
+
+    // Create client threads
+    pthread_t clientThreads[MAX_THREADS];
+    for (int i = 0; i < clicount; ++i)
+    {
+        if (pthread_create(&clientThreads[i], NULL, clientWorker, (void *)i) != 0)
         {
             perror("Error creating client thread");
             exit(EXIT_FAILURE);
         }
     }
+
+    // Join frontend thread
+    pthread_join(frontendThread, NULL);
 
     // Join client threads
     for (int i = 0; i < clicount; ++i)
@@ -108,57 +182,11 @@ int main(int argc, char *argv[])
     mq_close(mq1);
     mq_close(mq2);
 
-    return 0;
-}
-
-void *clientWorker(void *arg)
-{
-    while (1)
+    // Destroy condition variables
+    for (int i = 0; i < clicount; ++i)
     {
-        // Lock the file mutex to read from the file
-        pthread_mutex_lock(&file_mutex);
-
-        // Read the next line from the file
-        char requestBuffer[REQUEST_BUFFER_SIZE];
-        if (fgets(requestBuffer, REQUEST_BUFFER_SIZE, fopen(fname, "r")) == NULL)
-        {
-            // End of file reached, release the mutex and exit the thread
-            pthread_mutex_unlock(&file_mutex);
-            break;
-        }
-
-        // Increment the current line counter
-        current_line++;
-
-        // Unlock the file mutex
-        pthread_mutex_unlock(&file_mutex);
-
-        // Create a request message
-        Message requestMessage;
-        requestMessage.isServer = false;
-        requestMessage.quit = false;
-        requestMessage.messageType = PUT_REQUEST; // Modify based on your requirements
-        requestMessage.success = false;
-        requestMessage.keySize = sizeof(long int);    // Modify based on your requirements
-        requestMessage.valueSize = svsize;            // Modify based on your requirements
-        requestMessage.key = 12345;                   // Modify based on your requirements
-        requestMessage.value = strdup(requestBuffer); // Modify based on your requirements
-
-        // Send the request message to MQ1
-        if (mq_send(mq1, (const char *)&requestMessage, sizeof(Message), 0) == -1)
-        {
-            perror("Error sending request message to MQ1");
-            exit(EXIT_FAILURE);
-        }
-
-        // Wait for the response on MQ2 (You need to implement this part based on your design)
-        // You may need to use a separate function to handle the response.
-
-        // ...
-
-        // Signal or broadcast to wake up the main thread
-        pthread_cond_signal(&file_cond);
+        pthread_cond_destroy(&response_cond[i]);
     }
 
-    pthread_exit(NULL);
+    return 0;
 }

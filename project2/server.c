@@ -245,6 +245,8 @@ void *worker(void *arg)
         printf("Worker Thread %d is processing Message ID: %d\n", thread_id, message.messageType);
         pthread_cond_signal(&mq1_empty);
     }
+
+    pthread_exit(NULL);
 }
 
 void *frontend(void *arg)
