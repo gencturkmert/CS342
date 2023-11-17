@@ -125,7 +125,7 @@ void *worker(void *arg)
 
             if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
             {
-                perror("Error sending PUT_RESPONSE message to mq2");
+                printf("Error sending PUT_RESPONSE message to mq2");
                 exit(EXIT_FAILURE);
             }
 
@@ -154,7 +154,7 @@ void *worker(void *arg)
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
                 {
-                    perror("Error sending successful DELETE_RESPONSE message to mq2");
+                    printf("Error sending successful DELETE_RESPONSE message to mq2");
                     exit(EXIT_FAILURE);
                 }
 
@@ -174,7 +174,7 @@ void *worker(void *arg)
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
                 {
-                    perror("Error sending failed DELETE_RESPONSE message to mq2, key does not exist");
+                    printf("Error sending failed DELETE_RESPONSE message to mq2, key does not exist");
                     exit(EXIT_FAILURE);
                 }
 
@@ -207,7 +207,7 @@ void *worker(void *arg)
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
                 {
-                    perror("Error sending successful GET_RESPONSE message to mq2");
+                    printf("Error sending successful GET_RESPONSE message to mq2");
                     exit(EXIT_FAILURE);
                 }
 
@@ -228,12 +228,13 @@ void *worker(void *arg)
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
                 {
-                    perror("Error sending failed GET_RESPONSE message to mq2, key does not exist");
+                    printf("Error sending failed GET_RESPONSE message to mq2, key does not exist");
                     exit(EXIT_FAILURE);
                 }
 
                 printf("Thread %d: Key %ld not found\n", thread_id, key);
             }
+
             break;
         }
 
@@ -350,13 +351,13 @@ int main(int argc, char *argv[])
 
     if (mq1 == (mqd_t)-1 || mq2 == (mqd_t)-1)
     {
-        perror("Error opening message queues");
+        printf("Error opening message queues");
         exit(EXIT_FAILURE);
     }
 
     if (mq1 == (mqd_t)-1 || mq2 == (mqd_t)-1)
     {
-        perror("Error opening message queues");
+        printf("Error opening message queues");
         exit(EXIT_FAILURE);
     }
 
@@ -368,7 +369,7 @@ int main(int argc, char *argv[])
         filePointers[i - 1] = fopen(filename, "ab+");
         if (filePointers[i - 1] == NULL)
         {
-            perror("Error opening or creating data file");
+            fprintf(stderr, "Failed to open file: %s\n", filename);
             exit(EXIT_FAILURE);
         }
     }
@@ -411,7 +412,7 @@ int main(int argc, char *argv[])
         thread_ids[i] = i + 1;
         if (pthread_create(&worker_threads[i], NULL, worker, (void *)&thread_ids[i]) != 0)
         {
-            perror("Error creating worker thread");
+            printf("Error creating worker thread");
             exit(EXIT_FAILURE);
         }
     }
@@ -419,7 +420,7 @@ int main(int argc, char *argv[])
     // Create frontend thread
     if (pthread_create(&frontend_thread, NULL, frontend, NULL) != 0)
     {
-        perror("Error creating frontend thread");
+        printf("Error creating frontend thread");
         exit(EXIT_FAILURE);
     }
 
