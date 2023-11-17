@@ -5,13 +5,15 @@
 #include <pthread.h>
 #include "shared_defs.h"
 #include <fcntl.h>
+#include "queue.h"
 
-#define MAX_THREADS 10
+#define MAX_CLIENTS 10
 #define REQUEST_BUFFER_SIZE 256
 
 // Global variables
 mqd_t mq1, mq2;
-pthread_cond_t response_cond[MAX_THREADS];
+pthread_mutex_t response_mutex[MAX_CLIENTS];
+pthread_cond_t response_cond[MAX_CLIENTS];
 char fname[256];
 int vsize;
 FILE *filePointers[MAX_CLIENTS];
@@ -27,18 +29,33 @@ void *clientWorker(void *arg)
         // Use thread-specific file
         if (fgets(requestBuffer, REQUEST_BUFFER_SIZE, filePointers[thread_id]) == NULL)
         {
-            pthread_exit(NULL);
+            break;
         }
 
         Message requestMessage;
 
         if (mq_send(mq1, (const char *)&requestMessage, sizeof(Message), 0) == -1)
         {
-            perror("Error sending request message to MQ1");
+            printf("Error sending request message to MQ1");
             exit(EXIT_FAILURE);
         }
+        // Lock the mutex for the corresponding client thread
+        pthread_mutex_lock(&response_mutex[thread_id]);
 
-        pthread_cond_wait(&response_cond[thread_id], NULL);
+        // Wait for a response message
+        while (responseQueues[thread_id].front == NULL)
+        {
+            pthread_cond_wait(&response_cond[thread_id], &response_mutex[thread_id]);
+        }
+
+        // Dequeue the response message
+        Message responseMessage = dequeue(&responseQueues[thread_id]);
+
+        // Unlock the mutex for the corresponding client thread
+        pthread_mutex_unlock(&response_mutex[thread_id]);
+
+        // Process the responseMessage as needed
+        // ...
     }
 
     pthread_exit(NULL);
@@ -48,15 +65,23 @@ void *frontend(void *arg)
 {
     while (1)
     {
-        // Receive messages from MQ2 and wake up the corresponding thread
         Message responseMessage;
         if (mq_receive(mq2, (char *)&responseMessage, sizeof(Message), NULL) > 0)
         {
             // Extract the thread ID from the response message
             int thread_id = /* Extract thread ID from the responseMessage */;
 
-            // Signal or broadcast to wake up the corresponding thread
+            // Lock the mutex for the corresponding client thread
+            pthread_mutex_lock(&response_mutex[thread_id]);
+
+            // Enqueue the response message into the corresponding queue
+            enqueue(&responseQueues[thread_id], responseMessage);
+
+            // Signal or broadcast to wake up the corresponding client thread
             pthread_cond_signal(&response_cond[thread_id]);
+
+            // Unlock the mutex for the corresponding client thread
+            pthread_mutex_unlock(&response_mutex[thread_id]);
         }
     }
 
@@ -117,13 +142,6 @@ int main(int argc, char *argv[])
     printf("mqname: %s\n", mqname);
     printf("dlevel: %d\n", dlevel);
 
-    // Append 1 and 2 to mqname for MQ1 and MQ2
-    pthread_cond_t response_cond[MAX_THREADS];
-    for (int i = 0; i < clicount; ++i)
-    {
-        pthread_cond_init(&response_cond[i], NULL);
-    }
-
     char mqname1[256], mqname2[256];
 
     snprintf(mqname1, sizeof(mqname1), "/%s1", mqname);
@@ -150,7 +168,19 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Create frontend thread
+    for (int i = 0; i < clicount; ++i)
+    {
+        pthread_mutex_init(&response_mutex[i], NULL);
+        pthread_cond_init(&response_cond[i], NULL);
+    }
+
+    ResponseQueue responseQueues[MAX_CLIENTS];
+
+    for (int i = 0; i < MAX_CLIENTS; ++i)
+    {
+        initQueue(&responseQueues[i]);
+    }
+
     pthread_t frontendThread;
     if (pthread_create(&frontendThread, NULL, frontend, NULL) != 0)
     {
@@ -158,11 +188,11 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    // Create client threads
-    pthread_t clientThreads[MAX_THREADS];
+    int thread_ids[clicount];
+    pthread_t clientThreads[MAX_CLIENTS];
     for (int i = 0; i < clicount; ++i)
     {
-        if (pthread_create(&clientThreads[i], NULL, clientWorker, (void *)i) != 0)
+        if (pthread_create(&clientThreads[i], NULL, clientWorker, (void *)&thread_ids[i]) != 0)
         {
             perror("Error creating client thread");
             exit(EXIT_FAILURE);

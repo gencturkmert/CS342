@@ -52,6 +52,7 @@ void *worker(void *arg)
         long int key = buffer[front].key;
         char *value = buffer[front].value;
         bool quit = buffer[front].quit;
+        int id = buffer[front].id;
 
         if (quit)
         {
@@ -119,6 +120,7 @@ void *worker(void *arg)
             responseMessage.valueSize = 0;
             responseMessage.key = key;
             responseMessage.value = NULL;
+            responseMessage.id = id;
 
             if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
             {
@@ -148,6 +150,7 @@ void *worker(void *arg)
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
                 responseMessage.value = NULL;
+                responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
                 {
@@ -168,6 +171,7 @@ void *worker(void *arg)
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
                 responseMessage.value = NULL;
+                responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
                 {
@@ -201,6 +205,7 @@ void *worker(void *arg)
                 responseMessage.valueSize = vsize;
                 responseMessage.key = key;
                 responseMessage.value = value;
+                responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
                 {
@@ -222,6 +227,7 @@ void *worker(void *arg)
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
                 responseMessage.value = NULL;
+                responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
                 {

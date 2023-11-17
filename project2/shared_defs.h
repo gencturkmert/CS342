@@ -23,6 +23,7 @@ typedef struct
     size_t valueSize;
     long int key;
     char *value;
+    int id;
 } Message;
 
 #endif // SHARED_DEFS_H
