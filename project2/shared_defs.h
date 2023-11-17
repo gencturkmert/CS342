@@ -24,6 +24,7 @@ typedef struct
     long int key;
     char *value;
     int id;
+    bool dump;
 } Message;
 
 #endif // SHARED_DEFS_H

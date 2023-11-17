@@ -6,6 +6,7 @@
 #include "shared_defs.h"
 #include <fcntl.h>
 #include "queue.h"
+#include <string.h>
 
 #define MAX_CLIENTS 10
 #define REQUEST_BUFFER_SIZE 256
@@ -17,6 +18,71 @@ pthread_cond_t response_cond[MAX_CLIENTS];
 char fname[256];
 int vsize;
 FILE *filePointers[MAX_CLIENTS];
+
+Message parseRequestString(const char *requestString)
+{
+    Message message;
+    memset(&message, 0, sizeof(Message));
+
+    // Parse the requestString and fill in the message struct
+    char typeStr[10];
+    if (sscanf(requestString, "%s %ld", typeStr, &(message.key)) < 2)
+    {
+        // Handle parsing error
+        fprintf(stderr, "Error parsing request string: %s\n", requestString);
+        exit(EXIT_FAILURE);
+    }
+
+    // Convert type string to enum
+    if (strcmp(typeStr, "GET") == 0)
+    {
+        message.messageType = GET_REQUEST;
+    }
+    else if (strcmp(typeStr, "PUT") == 0)
+    {
+        message.messageType = PUT_REQUEST;
+
+        // Parse optional value for PUT request
+        if (sscanf(requestString, "%*s %ld %s", &(message.key), message.value) < 2)
+        {
+            // Handle parsing error
+            fprintf(stderr, "Error parsing PUT request string: %s\n", requestString);
+            exit(EXIT_FAILURE);
+        }
+
+        // Set valueSize and allocate memory for value based on global vsize
+        message.valueSize = vsize;
+        message.value = malloc(message.valueSize);
+        if (message.value == NULL)
+        {
+            fprintf(stderr, "Error allocating memory for value\n");
+            exit(EXIT_FAILURE);
+        }
+
+        // Pad the value with spaces to ensure it's vsize bytes
+        snprintf(message.value, vsize, "%-*s", vsize - 1, message.value);
+    }
+    else if (strcmp(typeStr, "DEL") == 0)
+    {
+        message.messageType = DELETE_REQUEST;
+    }
+    else if (strcmp(typeStr, "QUITSERVER") == 0)
+    {
+        message.quit = 1;
+    }
+    else if (strcmp(typeStr, "DUMP") == 0)
+    {
+        message.dump = 1;
+    }
+    else
+    {
+        // Handle unknown request type
+        fprintf(stderr, "Unknown request type in string: %s\n", requestString);
+        exit(EXIT_FAILURE);
+    }
+
+    return message;
+}
 
 void *clientWorker(void *arg)
 {
@@ -32,27 +98,29 @@ void *clientWorker(void *arg)
             break;
         }
 
-        Message requestMessage;
+        Message requestMessage = parseRequestString(requestBuffer);
+        requestMessage.id = thread_id;
 
         if (mq_send(mq1, (const char *)&requestMessage, sizeof(Message), 0) == -1)
         {
             printf("Error sending request message to MQ1");
             exit(EXIT_FAILURE);
         }
-        // Lock the mutex for the corresponding client thread
         pthread_mutex_lock(&response_mutex[thread_id]);
 
-        // Wait for a response message
         while (responseQueues[thread_id].front == NULL)
         {
             pthread_cond_wait(&response_cond[thread_id], &response_mutex[thread_id]);
         }
 
-        // Dequeue the response message
         Message responseMessage = dequeue(&responseQueues[thread_id]);
 
-        // Unlock the mutex for the corresponding client thread
         pthread_mutex_unlock(&response_mutex[thread_id]);
+
+        if (requestMessage.messageType == PUT_REQUEST)
+        {
+            free(requestMessage.value);
+        }
 
         // Process the responseMessage as needed
         // ...

@@ -3,6 +3,7 @@
     "*.embeddedhtml": "html",
     "linkedlist.h": "c",
     "hash_table.h": "c",
-    "fcntl.h": "c"
+    "fcntl.h": "c",
+    "string.h": "c"
   }
 }
