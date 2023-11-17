@@ -16,24 +16,21 @@ int ttcount;
 int svsize;
 char mmqname[256];
 
-// Global File Pointers Array
 FILE *filePointers[MAX_FILES];
 pthread_mutex_t file_mutex[MAX_FILES];
 pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t mq1_empty = PTHREAD_COND_INITIALIZER;
 pthread_cond_t mq1_full = PTHREAD_COND_INITIALIZER;
 
-// Circular Buffer
 Message buffer[BUFFER_SIZE];
 
-int front = 0;       // Front index of the circular buffer
-int rear = 0;        // Rear index of the circular buffer
-int buffer_size = 0; // Number of messages in the buffer
+int front = 0;
+int rear = 0;
+int buffer_size = 0;
 
 int deletion_marker = -1;
 bool should_exit = false;
 
-// Global HashTable Array
 HashTable globalHashTables[MAX_FILES];
 
 mqd_t mq1, mq2;
@@ -250,19 +247,15 @@ void *worker(void *arg)
     }
 }
 
-// Frontend Function
 void *frontend(void *arg)
 {
-    // Access message queue in a synchronized manner
     pthread_mutex_lock(&buffer_mutex);
 
     while (should_exit)
     {
-        // Check if there is a message in mq1
         Message newMessage;
         if (mq_receive(mq1, (char *)&newMessage, sizeof(Message), NULL) > 0)
         {
-            // Wait for the buffer to have space before adding a new message
             while (buffer_size == BUFFER_SIZE)
             {
                 pthread_mutex_unlock(&buffer_mutex);
@@ -270,17 +263,14 @@ void *frontend(void *arg)
                 pthread_mutex_lock(&buffer_mutex);
             }
 
-            // Add the new message to the buffer
             buffer[rear] = newMessage;
             rear = (rear + 1) % BUFFER_SIZE;
             buffer_size++;
 
-            // Signal that the buffer is not empty
             pthread_cond_signal(&mq1_full);
         }
     }
 
-    // Release the buffer mutex
     pthread_mutex_unlock(&buffer_mutex);
 
     pthread_exit(NULL);
@@ -288,7 +278,6 @@ void *frontend(void *arg)
 
 int main(int argc, char *argv[])
 {
-    // Check if the number of arguments is correct
     if (argc != 13)
     {
         printf("Usage: ./your_program -serverk <value> -ddcount <value> -ffname <value> -ttcount <value> -svsize <value> -mmqname <value>\n");
@@ -376,13 +365,10 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < ddcount; ++i)
     {
-        // Open data file for reading
         FILE *file = filePointers[i];
 
-        // Create a hash table for this data file
-        initHashTable(&globalHashTables[i], 1024); // You can adjust the size of the hash table as needed
+        initHashTable(&globalHashTables[i], 1024);
 
-        // Read the data file and generate the hash table
         long int key;
         size_t offset = 0;
 
@@ -394,19 +380,16 @@ int main(int argc, char *argv[])
                 updateHashTable(&globalHashTables[i], key, offset + sizeof(long int));
             }
 
-            // Move to the next data item
-            fseek(file, svsize, SEEK_CUR); // Adjust the offset accordingly
+            fseek(file, svsize, SEEK_CUR);
             offset += sizeof(long int) + svsize;
         }
     }
 
-    // Initialize and create threads
     pthread_t worker_threads[ttcount];
     pthread_t frontend_thread;
 
     int thread_ids[ttcount];
 
-    // Create worker threads
     for (int i = 0; i < ttcount; ++i)
     {
         thread_ids[i] = i + 1;
@@ -417,25 +400,22 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Create frontend thread
     if (pthread_create(&frontend_thread, NULL, frontend, NULL) != 0)
     {
         printf("Error creating frontend thread");
         exit(EXIT_FAILURE);
     }
 
-    // Wait for worker threads to finish (this part will not be reached in the infinite loop scenario)
     for (int i = 0; i < ttcount; ++i)
     {
         pthread_join(worker_threads[i], NULL);
     }
 
-    // Close the file pointers
     for (int i = 0; i < ddcount; ++i)
     {
         fclose(filePointers[i]);
     }
-    // Close the message queues
+
     mq_close(mq1);
     mq_close(mq2);
     return 0;
