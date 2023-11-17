@@ -9,12 +9,11 @@
 #define BUFFER_SIZE 128
 #define MAX_FILES 5
 
-int serverk;
-int ddcount;
-char ffname[256];
-int ttcount;
-int svsize;
-char mmqname[256];
+int dcount;
+char fname[256];
+int tcount;
+int vsize;
+char mqname[256];
 
 FILE *filePointers[MAX_FILES];
 pthread_mutex_t file_mutex[MAX_FILES];
@@ -58,7 +57,7 @@ void *worker(void *arg)
             should_exit = true;
         }
 
-        int file_index = (message.key % ddcount);
+        int file_index = (message.key % dcount);
 
         front = (front + 1) % BUFFER_SIZE;
         buffer_size--;
@@ -76,37 +75,37 @@ void *worker(void *arg)
 
             if (offset != -1)
             {
-                if (strlen(value) < svsize)
+                if (strlen(value) < vsize)
                 {
                     fwrite(value, sizeof(char), strlen(value), file);
-                    size_t remainingBytes = svsize - strlen(value);
+                    size_t remainingBytes = vsize - strlen(value);
                     char nullBytes[remainingBytes];
                     memset(nullBytes, 0, remainingBytes);
                     fwrite(nullBytes, sizeof(char), remainingBytes, file);
                 }
                 else
                 {
-                    fwrite(value, sizeof(char), svsize, file);
+                    fwrite(value, sizeof(char), vsize, file);
                 }
             }
             else
             {
                 fseek(file, 0, SEEK_END);
                 fwrite(&key, sizeof(long int), 1, file);
-                if (strlen(value) < svsize)
+                if (strlen(value) < vsize)
                 {
                     fwrite(value, sizeof(char), strlen(value), file);
-                    size_t remainingBytes = svsize - strlen(value);
+                    size_t remainingBytes = vsize - strlen(value);
                     char nullBytes[remainingBytes];
                     memset(nullBytes, 0, remainingBytes);
                     fwrite(nullBytes, sizeof(char), remainingBytes, file);
                 }
                 else
                 {
-                    fwrite(value, sizeof(char), svsize, file);
+                    fwrite(value, sizeof(char), vsize, file);
                 }
 
-                size_t newOffset = ftell(file) - svsize;
+                size_t newOffset = ftell(file) - vsize;
                 updateHashTable(&globalHashTables[file_index], key, newOffset);
             }
 
@@ -137,7 +136,7 @@ void *worker(void *arg)
             {
                 FILE *file = filePointers[file_index];
                 fseek(file, offset - sizeof(long int), SEEK_SET);
-                fwrite(&deletionMarker, sizeof(long int), 1, file);
+                fwrite(&deletion_marker, sizeof(long int), 1, file);
 
                 Message responseMessage;
                 responseMessage.isServer = true;
@@ -189,8 +188,8 @@ void *worker(void *arg)
                 FILE *file = filePointers[file_index];
                 fseek(file, offset, SEEK_SET);
 
-                char *value = (char *)malloc(svsize);
-                fread(value, sizeof(char), svsize, file);
+                char *value = (char *)malloc(vsize);
+                fread(value, sizeof(char), vsize, file);
 
                 Message responseMessage;
                 responseMessage.isServer = true;
@@ -198,7 +197,7 @@ void *worker(void *arg)
                 responseMessage.messageType = GET_REQUEST;
                 responseMessage.success = true;
                 responseMessage.keySize = sizeof(long int);
-                responseMessage.valueSize = svsize;
+                responseMessage.valueSize = vsize;
                 responseMessage.key = key;
                 responseMessage.value = value;
 
@@ -278,9 +277,9 @@ void *frontend(void *arg)
 
 int main(int argc, char *argv[])
 {
-    if (argc != 13)
+    if (argc != 12)
     {
-        printf("Usage: ./your_program -serverk <value> -ddcount <value> -ffname <value> -ttcount <value> -svsize <value> -mmqname <value>\n");
+        printf("Usage: ./serverk -d <dcount> -f <fname> -t <tcount> -s <vsize> -m <mqname>\n");
         exit(EXIT_FAILURE);
     }
 
@@ -289,51 +288,46 @@ int main(int argc, char *argv[])
         if (i + 1 >= argc)
         {
             printf("Invalid number of arguments\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
-        if (strcmp(argv[i], "-serverk") == 0)
+        if (strcmp(argv[i], "-d") == 0)
         {
-            serverk = atoi(argv[i + 1]);
+            dcount = atoi(argv[i + 1]);
         }
-        else if (strcmp(argv[i], "-ddcount") == 0)
+        else if (strcmp(argv[i], "-f") == 0)
         {
-            ddcount = atoi(argv[i + 1]);
+            strncpy(fname, argv[i + 1], sizeof(fname));
         }
-        else if (strcmp(argv[i], "-ffname") == 0)
+        else if (strcmp(argv[i], "-t") == 0)
         {
-            strncpy(ffname, argv[i + 1], sizeof(ffname));
+            tcount = atoi(argv[i + 1]);
         }
-        else if (strcmp(argv[i], "-ttcount") == 0)
+        else if (strcmp(argv[i], "-s") == 0)
         {
-            ttcount = atoi(argv[i + 1]);
+            vsize = atoi(argv[i + 1]);
         }
-        else if (strcmp(argv[i], "-svsize") == 0)
+        else if (strcmp(argv[i], "-m") == 0)
         {
-            svsize = atoi(argv[i + 1]);
-        }
-        else if (strcmp(argv[i], "-mmqname") == 0)
-        {
-            strncpy(mmqname, argv[i + 1], sizeof(mmqname));
+            strncpy(mqname, argv[i + 1], sizeof(mqname));
         }
         else
         {
             printf("Invalid arguments\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
 
-    printf("serverk: %d\n", serverk);
-    printf("ddcount: %d\n", ddcount);
-    printf("ffname: %s\n", ffname);
-    printf("ttcount: %d\n", ttcount);
-    printf("svsize: %d\n", svsize);
-    printf("mmqname: %s\n", mmqname);
+    printf("dcount: %d\n", dcount);
+    printf("fname: %s\n", fname);
+    printf("tcount: %d\n", tcount);
+    printf("vsize: %d\n", vsize);
+    printf("mqname: %s\n", mqname);
 
     char mqname1[256], mqname2[256];
 
-    snprintf(mqname1, sizeof(mqname1), "/%s1", mmqname);
-    snprintf(mqname2, sizeof(mqname2), "/%s2", mmqname);
+    snprintf(mqname1, sizeof(mqname1), "/%s1", mqname);
+    snprintf(mqname2, sizeof(mqname2), "/%s2", mqname);
 
     mq1 = mq_open(mqname1, O_CREAT | O_RDWR, 0666, NULL);
     mq2 = mq_open(mqname2, O_CREAT | O_RDWR, 0666, NULL);
@@ -350,10 +344,10 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 1; i <= ddcount; ++i)
+    for (int i = 1; i <= dcount; ++i)
     {
         char filename[256];
-        snprintf(filename, sizeof(filename), "%s%d", ffname, i);
+        snprintf(filename, sizeof(filename), "%s%d", fname, i);
 
         filePointers[i - 1] = fopen(filename, "ab+");
         if (filePointers[i - 1] == NULL)
@@ -363,7 +357,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    for (int i = 0; i < ddcount; ++i)
+    for (int i = 0; i < dcount; ++i)
     {
         FILE *file = filePointers[i];
 
@@ -380,17 +374,17 @@ int main(int argc, char *argv[])
                 updateHashTable(&globalHashTables[i], key, offset + sizeof(long int));
             }
 
-            fseek(file, svsize, SEEK_CUR);
-            offset += sizeof(long int) + svsize;
+            fseek(file, vsize, SEEK_CUR);
+            offset += sizeof(long int) + vsize;
         }
     }
 
-    pthread_t worker_threads[ttcount];
+    pthread_t worker_threads[tcount];
     pthread_t frontend_thread;
 
-    int thread_ids[ttcount];
+    int thread_ids[tcount];
 
-    for (int i = 0; i < ttcount; ++i)
+    for (int i = 0; i < tcount; ++i)
     {
         thread_ids[i] = i + 1;
         if (pthread_create(&worker_threads[i], NULL, worker, (void *)&thread_ids[i]) != 0)
@@ -406,12 +400,12 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < ttcount; ++i)
+    for (int i = 0; i < tcount; ++i)
     {
         pthread_join(worker_threads[i], NULL);
     }
 
-    for (int i = 0; i < ddcount; ++i)
+    for (int i = 0; i < dcount; ++i)
     {
         fclose(filePointers[i]);
     }
