@@ -3,6 +3,8 @@
 #include <string.h>
 #include <mqueue.h>
 #include "shared_defs.h"
+#include <fcntl.h>
+#include <pthread.h>
 
 #define MAX_FILES 5
 

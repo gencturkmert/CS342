@@ -2,6 +2,7 @@
   "files.associations": {
     "*.embeddedhtml": "html",
     "linkedlist.h": "c",
-    "hash_table.h": "c"
+    "hash_table.h": "c",
+    "fcntl.h": "c"
   }
 }

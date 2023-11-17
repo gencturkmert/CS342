@@ -3,6 +3,7 @@
 #include <string.h>
 #include <mqueue.h>
 #include <pthread.h>
+#include <fcntl.h>
 #include "shared_defs.h"
 #include "hash_table.h"
 
