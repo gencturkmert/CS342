@@ -18,7 +18,7 @@ void initHashTable(HashTable *hashTable, size_t size)
 
     if (pthread_mutex_init(&(hashTable->table_mutex), NULL) != 0)
     {
-        perror("Error initializing hash table mutex");
+        printf("Error initializing hash table mutex");
         exit(EXIT_FAILURE);
     }
 }
