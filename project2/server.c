@@ -30,48 +30,221 @@ int front = 0;       // Front index of the circular buffer
 int rear = 0;        // Rear index of the circular buffer
 int buffer_size = 0; // Number of messages in the buffer
 
+int deletion_marker = -1;
+bool should_exit = false;
+
 // Global HashTable Array
 HashTable globalHashTables[MAX_FILES];
+
+mqd_t mq1, mq2;
 
 void *worker(void *arg)
 {
     int thread_id = *((int *)arg);
 
-    while (1)
+    while (!should_exit)
     {
-        // Access files in a synchronized manner
-        pthread_mutex_lock(&worker_mutex);
-
-        // Access the buffer in a synchronized manner
         pthread_mutex_lock(&buffer_mutex);
 
-        // Wait until the buffer is not empty
         while (buffer_size == 0)
         {
             pthread_cond_wait(&mq1_full, &buffer_mutex);
         }
 
-        // Perform operations on the buffer or any other shared resources
-        Message message = buffer[front];
+        MessageType messageType = buffer[front].messageType;
+        long int key = buffer[front].key;
+        char *value = buffer[front].value;
+        bool quit = buffer[front].quit;
+
+        if (quit)
+        {
+            should_exit = true;
+        }
+
+        int file_index = (message.key % ddcount);
+
         front = (front + 1) % BUFFER_SIZE;
         buffer_size--;
 
-        // Release the buffer mutex
         pthread_mutex_unlock(&buffer_mutex);
-
-        int file_index = (message.key % ddcount) + 1;
 
         pthread_mutex_lock(&file_mutex[file_index]);
 
-        // Process the message and access the file
-        // ...
+        switch (messageType)
+        {
+        case PUT_REQUEST:
+        {
+            size_t offset = getOffsetForKey(key, &globalHashTables[file_index]);
+            FILE *file = filePointers[file_index];
 
-        // Release the file lock
+            if (offset != -1)
+            {
+                if (strlen(value) < svsize)
+                {
+                    fwrite(value, sizeof(char), strlen(value), file);
+                    size_t remainingBytes = svsize - strlen(value);
+                    char nullBytes[remainingBytes];
+                    memset(nullBytes, 0, remainingBytes);
+                    fwrite(nullBytes, sizeof(char), remainingBytes, file);
+                }
+                else
+                {
+                    fwrite(value, sizeof(char), svsize, file);
+                }
+            }
+            else
+            {
+                fseek(file, 0, SEEK_END);
+                fwrite(&key, sizeof(long int), 1, file);
+                if (strlen(value) < svsize)
+                {
+                    fwrite(value, sizeof(char), strlen(value), file);
+                    size_t remainingBytes = svsize - strlen(value);
+                    char nullBytes[remainingBytes];
+                    memset(nullBytes, 0, remainingBytes);
+                    fwrite(nullBytes, sizeof(char), remainingBytes, file);
+                }
+                else
+                {
+                    fwrite(value, sizeof(char), svsize, file);
+                }
+
+                size_t newOffset = ftell(file) - svsize;
+                updateHashTable(&globalHashTables[file_index], key, newOffset);
+            }
+
+            Message responseMessage;
+            responseMessage.isServer = true;
+            responseMessage.quit = false;
+            responseMessage.messageType = PUT_REQUEST;
+            responseMessage.success = true;
+            responseMessage.keySize = sizeof(long int);
+            responseMessage.valueSize = 0;
+            responseMessage.key = key;
+            responseMessage.value = NULL;
+
+            if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
+            {
+                perror("Error sending PUT_RESPONSE message to mq2");
+                exit(EXIT_FAILURE);
+            }
+
+            break;
+        }
+
+        case DELETE_REQUEST:
+        {
+            size_t offset = getOffsetForKey(key, &globalHashTables[file_index]);
+
+            if (offset != -1)
+            {
+                FILE *file = filePointers[file_index];
+                fseek(file, offset - sizeof(long int), SEEK_SET);
+                fwrite(&deletionMarker, sizeof(long int), 1, file);
+
+                Message responseMessage;
+                responseMessage.isServer = true;
+                responseMessage.quit = false;
+                responseMessage.messageType = DELETE_REQUEST;
+                responseMessage.success = true;
+                responseMessage.keySize = sizeof(long int);
+                responseMessage.valueSize = 0;
+                responseMessage.key = key;
+                responseMessage.value = NULL;
+
+                if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
+                {
+                    perror("Error sending successful DELETE_RESPONSE message to mq2");
+                    exit(EXIT_FAILURE);
+                }
+
+                printf("Thread %d: Key %ld deleted\n", thread_id, key);
+            }
+            else
+            {
+                Message responseMessage;
+                responseMessage.isServer = true;
+                responseMessage.quit = false;
+                responseMessage.messageType = DELETE_REQUEST;
+                responseMessage.success = false;
+                responseMessage.keySize = sizeof(long int);
+                responseMessage.valueSize = 0;
+                responseMessage.key = key;
+                responseMessage.value = NULL;
+
+                if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
+                {
+                    perror("Error sending failed DELETE_RESPONSE message to mq2, key does not exist");
+                    exit(EXIT_FAILURE);
+                }
+
+                printf("Thread %d: Key %ld not found\n", thread_id, key);
+            }
+            break;
+        }
+
+        case GET_REQUEST:
+        {
+            size_t offset = getOffsetForKey(key, &globalHashTables[file_index]);
+
+            if (offset != -1)
+            {
+                FILE *file = filePointers[file_index];
+                fseek(file, offset, SEEK_SET);
+
+                char *value = (char *)malloc(svsize);
+                fread(value, sizeof(char), svsize, file);
+
+                Message responseMessage;
+                responseMessage.isServer = true;
+                responseMessage.quit = false;
+                responseMessage.messageType = GET_REQUEST;
+                responseMessage.success = true;
+                responseMessage.keySize = sizeof(long int);
+                responseMessage.valueSize = svsize;
+                responseMessage.key = key;
+                responseMessage.value = value;
+
+                if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
+                {
+                    perror("Error sending successful GET_RESPONSE message to mq2");
+                    exit(EXIT_FAILURE);
+                }
+
+                printf("Thread %d: Key %ld, Value: %s\n", thread_id, key, value);
+                free(value);
+            }
+            else
+            {
+                Message responseMessage;
+                responseMessage.isServer = true;
+                responseMessage.quit = false;
+                responseMessage.messageType = GET_REQUEST;
+                responseMessage.success = false;
+                responseMessage.keySize = sizeof(long int);
+                responseMessage.valueSize = 0;
+                responseMessage.key = key;
+                responseMessage.value = NULL;
+
+                if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
+                {
+                    perror("Error sending failed GET_RESPONSE message to mq2, key does not exist");
+                    exit(EXIT_FAILURE);
+                }
+
+                printf("Thread %d: Key %ld not found\n", thread_id, key);
+            }
+            break;
+        }
+
+        default:
+            printf("Error: Invalid message type");
+            break;
+        }
+
         pthread_mutex_unlock(&file_mutex[file_index]);
 
-        printf("Worker Thread %d is processing Message ID: %d, Data: %s\n", thread_id, message.messageType, message.value);
-
-        // Signal that the buffer is not full
+        printf("Worker Thread %d is processing Message ID: %d\n", thread_id, message.messageType);
         pthread_cond_signal(&mq1_empty);
     }
 }
@@ -82,7 +255,7 @@ void *frontend(void *arg)
     // Access message queue in a synchronized manner
     pthread_mutex_lock(&buffer_mutex);
 
-    while (1)
+    while (should_exit)
     {
         // Check if there is a message in mq1
         Message newMessage;
@@ -167,7 +340,6 @@ int main(int argc, char *argv[])
     printf("svsize: %d\n", svsize);
     printf("mmqname: %s\n", mmqname);
 
-    mqd_t mq1, mq2;
     char mqname1[256], mqname2[256];
 
     snprintf(mqname1, sizeof(mqname1), "/%s1", mmqname);
@@ -215,11 +387,14 @@ int main(int argc, char *argv[])
 
         while (fread(&key, sizeof(long int), 1, file) == 1)
         {
-            // Update the hash table with the key and its offset
-            updateHashTable(&globalHashTables[i], key, offset);
+
+            if (key != deletion_marker)
+            {
+                updateHashTable(&globalHashTables[i], key, offset + sizeof(long int));
+            }
 
             // Move to the next data item
-            fseek(file, svsize, SEEK_CUR);
+            fseek(file, svsize, SEEK_CUR); // Adjust the offset accordingly
             offset += sizeof(long int) + svsize;
         }
     }

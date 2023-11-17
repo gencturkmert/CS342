@@ -22,7 +22,7 @@ typedef struct
     bool success;
     size_t keySize;
     size_t valueSize;
-    char *key;
+    long int key;
     char *value;
 } Message;
 
