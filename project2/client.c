@@ -24,61 +24,55 @@ Message parseRequestString(const char *requestString)
     Message message;
     memset(&message, 0, sizeof(Message));
 
-    // Parse the requestString and fill in the message struct
-    char typeStr[10];
-    if (sscanf(requestString, "%s %ld", typeStr, &(message.key)) < 2)
+    char typeStr[20];
+    if (sscanf(requestString, "%s", typeStr) < 1)
     {
-        // Handle parsing error
         fprintf(stderr, "Error parsing request string: %s\n", requestString);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
-    // Convert type string to enum
     if (strcmp(typeStr, "GET") == 0)
     {
         message.messageType = GET_REQUEST;
+        if (sscanf(requestString, "%*s %ld", &(message.key)) < 1)
+        {
+            fprintf(stderr, "Error parsing GET request string: %s\n", requestString);
+            return NULL;
+        }
     }
     else if (strcmp(typeStr, "PUT") == 0)
     {
         message.messageType = PUT_REQUEST;
-
-        // Parse optional value for PUT request
         if (sscanf(requestString, "%*s %ld %s", &(message.key), message.value) < 2)
         {
-            // Handle parsing error
             fprintf(stderr, "Error parsing PUT request string: %s\n", requestString);
-            exit(EXIT_FAILURE);
+            return NULL;
         }
-
-        // Set valueSize and allocate memory for value based on global vsize
-        message.valueSize = vsize;
-        message.value = malloc(message.valueSize);
-        if (message.value == NULL)
-        {
-            fprintf(stderr, "Error allocating memory for value\n");
-            exit(EXIT_FAILURE);
-        }
-
-        // Pad the value with spaces to ensure it's vsize bytes
-        snprintf(message.value, vsize, "%-*s", vsize - 1, message.value);
     }
     else if (strcmp(typeStr, "DEL") == 0)
     {
         message.messageType = DELETE_REQUEST;
+        if (sscanf(requestString, "%*s %ld", &(message.key)) < 1)
+        {
+            fprintf(stderr, "Error parsing DELETE request string: %s\n", requestString);
+            return NULL;
+        }
     }
     else if (strcmp(typeStr, "QUITSERVER") == 0)
     {
+        message.isServer = 1;
         message.quit = 1;
+        message.messageType = -1; // Set an indicator for quitserver
     }
     else if (strcmp(typeStr, "DUMP") == 0)
     {
         message.dump = 1;
+        message.messageType = -1; // Set an indicator for dump
     }
     else
     {
-        // Handle unknown request type
         fprintf(stderr, "Unknown request type in string: %s\n", requestString);
-        exit(EXIT_FAILURE);
+        return NULL;
     }
 
     return message;
@@ -92,10 +86,15 @@ void *clientWorker(void *arg)
     {
         char requestBuffer[REQUEST_BUFFER_SIZE];
 
-        // Use thread-specific file
         if (fgets(requestBuffer, REQUEST_BUFFER_SIZE, filePointers[thread_id]) == NULL)
         {
             break;
+        }
+
+        char *newline = strchr(requestBuffer, '\n');
+        if (newline != NULL)
+        {
+            *newline = '\0';
         }
 
         Message requestMessage = parseRequestString(requestBuffer);
