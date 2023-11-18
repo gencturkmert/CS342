@@ -47,8 +47,16 @@ Message parseRequestString(const char *requestString)
     }
     else if (strcmp(typeStr, "PUT") == 0)
     {
+        char* v;
         message.messageType = PUT_REQUEST;
-        if (sscanf(requestString, "%*s %ld %s", &(message.key), message.value))
+        int cc = sscanf(requestString, "%*s %ld %s", &(message.key), v);
+        fprintf(stderr,"key: %d\n",message.key);
+        printf("Value: %s\n", v);
+        fprintf(stderr," count %d",cc);
+
+        message.value = v;
+        printf("Value: %s\n", message.value);
+        if (cc<2)
         {
             fprintf(stderr, "Error parsing PUT request string: %s\n", requestString);
                     exit(EXIT_FAILURE);
@@ -107,11 +115,11 @@ void *clientWorker(void *arg)
             break;
         }
 
-        char *newline = strchr(requestBuffer, '\n');
+     /*    char *newline = strchr(requestBuffer, '\n');
         if (newline != NULL)
         {
             *newline = '\0';
-        }
+        } */
 
         Message requestMessage = parseRequestString(requestBuffer);
         requestMessage.id = thread_id;
@@ -248,6 +256,7 @@ int main(int argc, char *argv[])
 
         printf("File opened");
         printf(filename);
+        printf("\n");
     }
 
     for (int i = 0; i < clicount; ++i)
