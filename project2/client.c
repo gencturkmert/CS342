@@ -64,7 +64,7 @@ Message parseRequestString(const char *requestString)
     {
         message.isServer = 1;
         message.quit = 1;
-        message.messageType = -1; // Set an indicator for quitserver
+        message.messageType = -1;
     }
     else if (strcmp(typeStr, "DUMP") == 0)
     {
@@ -139,7 +139,7 @@ void *frontend(void *arg)
         if (mq_receive(mq2, (char *)&responseMessage, sizeof(Message), NULL) > 0)
         {
             // Extract the thread ID from the response message
-            int thread_id = /* Extract thread ID from the responseMessage */;
+            int thread_id = responseMessage.id;
 
             // Lock the mutex for the corresponding client thread
             pthread_mutex_lock(&response_mutex[thread_id]);
@@ -259,6 +259,7 @@ int main(int argc, char *argv[])
     pthread_t clientThreads[MAX_CLIENTS];
     for (int i = 0; i < clicount; ++i)
     {
+        thread_ids[i] = i;
         if (pthread_create(&clientThreads[i], NULL, clientWorker, (void *)&thread_ids[i]) != 0)
         {
             perror("Error creating client thread");
@@ -266,16 +267,13 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Join frontend thread
     pthread_join(frontendThread, NULL);
 
-    // Join client threads
     for (int i = 0; i < clicount; ++i)
     {
         pthread_join(clientThreads[i], NULL);
     }
 
-    // Close MQ1 and MQ2
     mq_close(mq1);
     mq_close(mq2);
 
