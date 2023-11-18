@@ -302,14 +302,15 @@ void *worker(void *arg)
 
 void *frontend(void *arg)
 {
-    pthread_mutex_lock(&buffer_mutex);
+    printf("Server frontend running \n");
 
-    while (should_exit)
+    while (!should_exit)
     {
         Message newMessage;
         if (mq_receive(mq1, (char *)&newMessage, sizeof(Message), NULL) > 0)
         {
             pthread_mutex_lock(&buffer_mutex);
+            printf("Server frontend accquired buffer lock buffer lock\\n");
 
             printf("Server received message\n");
             while (buffer_size == BUFFER_SIZE)
@@ -386,19 +387,20 @@ int main(int argc, char *argv[])
     snprintf(mqname1, sizeof(mqname1), "/%s1", mqname);
     snprintf(mqname2, sizeof(mqname2), "/%s2", mqname);
 
-    mq1 = mq_open(mqname1, O_CREAT | O_RDWR, 0666, NULL);
-    mq2 = mq_open(mqname2, O_CREAT | O_RDWR, 0666, NULL);
+    struct mq_attr attr;
+    attr.mq_flags = 0;
+    attr.mq_maxmsg = 10;
+    attr.mq_msgsize = sizeof(Message);
+    attr.mq_curmsgs = 0;
+    mq1 = mq_open(mqname1, O_CREAT | O_RDWR, 0666, &attr);
+    mq2 = mq_open(mqname2, O_CREAT | O_RDWR, 0666, &attr);
 
     if (mq1 == (mqd_t)-1 || mq2 == (mqd_t)-1)
     {
         printf("Error opening message queues");
         exit(EXIT_FAILURE);
-    }
-
-    if (mq1 == (mqd_t)-1 || mq2 == (mqd_t)-1)
-    {
-        printf("Error opening message queues");
-        exit(EXIT_FAILURE);
+    }else {
+        printf("Q opened %s and %s\n",mqname1,mqname2);
     }
 
     for (int i = 1; i <= dcount; ++i)
@@ -462,6 +464,11 @@ int main(int argc, char *argv[])
         pthread_join(worker_threads[i], NULL);
     }
 
+      for (int i = 0; i < tcount; ++i)
+    {
+        pthread_join(frontend_thread, NULL);
+    }
+
     for (int i = 0; i < dcount; ++i)
     {
         fclose(filePointers[i]);
@@ -469,5 +476,7 @@ int main(int argc, char *argv[])
 
     mq_close(mq1);
     mq_close(mq2);
+        printf("queues closed");
+
     return 0;
 }

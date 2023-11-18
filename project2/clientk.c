@@ -228,6 +228,8 @@ int main(int argc, char *argv[])
     {
         perror("Error opening message queues");
         exit(EXIT_FAILURE);
+    }else{
+        printf("Q opened %s and %s\n",mqname1,mqname2);
     }
     for (int i = 0; i < clicount; ++i)
     {
@@ -285,6 +287,7 @@ int main(int argc, char *argv[])
 
     mq_close(mq1);
     mq_close(mq2);
+    printf("queues closed");
 
     // Destroy condition variables
     for (int i = 0; i < clicount; ++i)

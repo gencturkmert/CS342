@@ -5,6 +5,8 @@
 #include <pthread.h>
 
 #define MAX_KEY_SIZE 1024
+#define MESSAGE_SIZE sizeof(struct msg_buffer)
+
 
 typedef enum
 {
