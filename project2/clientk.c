@@ -32,7 +32,7 @@ Message parseRequestString(const char *requestString)
     if (sscanf(requestString, "%s", typeStr) < 1)
     {
         fprintf(stderr, "Error parsing request string: %s\n", requestString);
-        EXIT(NULL);
+        exit(EXIT_FAILURE);
     }
 
     if (strcmp(typeStr, "GET") == 0)
@@ -41,7 +41,7 @@ Message parseRequestString(const char *requestString)
         if (sscanf(requestString, "%*s %ld", &(message.key)) < 1)
         {
             fprintf(stderr, "Error parsing GET request string: %s\n", requestString);
-            EXIT(NULL);
+        exit(EXIT_FAILURE);
 
         }
     }
@@ -51,7 +51,8 @@ Message parseRequestString(const char *requestString)
         if (sscanf(requestString, "%*s %ld %s", &(message.key), message.value))
         {
             fprintf(stderr, "Error parsing PUT request string: %s\n", requestString);
-            EXIT(NULL);
+                    exit(EXIT_FAILURE);
+
         }
     }
     else if (strcmp(typeStr, "DEL") == 0)
@@ -60,7 +61,8 @@ Message parseRequestString(const char *requestString)
         if (sscanf(requestString, "%*s %ld", &(message.key)) < 1)
         {
             fprintf(stderr, "Error parsing DELETE request string: %s\n", requestString);
-            EXIT(NULL);
+                    exit(EXIT_FAILURE);
+
 
         }
     }
@@ -76,14 +78,16 @@ Message parseRequestString(const char *requestString)
         if (sscanf(requestString, "%*s %s", message.value) < 1)
         {
             fprintf(stderr, "Error parsing DUMP request string: %s\n", requestString);
-            EXIT(NULL);
+                    exit(EXIT_FAILURE);
+
 
         }
     }
     else
     {
         fprintf(stderr, "Unknown request type in string: %s\n", requestString);
-        EXIT(NULL);
+                exit(EXIT_FAILURE);
+
 
     }
 
@@ -135,6 +139,7 @@ void *clientWorker(void *arg)
     }
 
     pthread_exit(NULL);
+
 }
 
 void *frontend(void *arg)
@@ -162,11 +167,12 @@ void *frontend(void *arg)
     }
 
     pthread_exit(NULL);
+
 }
 
 int main(int argc, char *argv[])
 {
-    if (argc != 12)
+    if (argc != 11)
     {
         printf("Usage: ./clientk -n <clicount> -f <fname> -s <vsize> -m <mqname> -d <dlevel>\n");
         exit(EXIT_FAILURE);

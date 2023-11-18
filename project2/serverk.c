@@ -327,7 +327,7 @@ void *frontend(void *arg)
 
 int main(int argc, char *argv[])
 {
-    if (argc != 12)
+    if (argc != 11)
     {
         printf("Usage: ./serverk -d <dcount> -f <fname> -t <tcount> -s <vsize> -m <mqname>\n");
         exit(EXIT_FAILURE);
