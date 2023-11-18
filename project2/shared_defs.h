@@ -14,13 +14,13 @@ typedef enum
     PUT_REQUEST,
     DELETE_REQUEST,
     GET_REQUEST,
-    QUITSERVER
+    QUITSERVER,
+    QUIT
 } MessageType;
 
 typedef struct
 {
     bool isServer;
-    bool quit;
     MessageType messageType;
     bool success;
     size_t valueSize;

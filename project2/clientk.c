@@ -28,12 +28,7 @@ Message parseRequestString(const char *requestString)
     Message message;
     memset(&message, 0, sizeof(Message));
     message.isServer = 0;
-    message.quit = 0;
-    message.quit = 0;
-    
-    if(dlevel ==1 ) {
-        printf(requestString);
-    }
+
 
     char typeStr[20];
     if (sscanf(requestString, "%s", typeStr) < 1)
@@ -63,7 +58,6 @@ Message parseRequestString(const char *requestString)
         }
         strncpy(message.value,v,sizeof(message.value)-1);
 
-        printf("Message VAl: %s\n",message.value);
     }
     else if (strcmp(typeStr, "DEL") == 0)
     {
@@ -77,11 +71,10 @@ Message parseRequestString(const char *requestString)
     else if (strcmp(typeStr, "QUITSERVER") == 0)
     {
         message.isServer = 0;
-        message.quit = 1;
         message.messageType = QUITSERVER;
 
     }else if(strcmp(typeStr,"QUIT") == 0) {
-        quit = true;
+        message.messageType = QUIT;
     }
     else if (strcmp(typeStr, "DUMP") == 0)
     {
@@ -117,21 +110,17 @@ void *clientWorker(void *arg)
             break;
         }
 
-        /*    char *newline = strchr(requestBuffer, '\n');
-           if (newline != NULL)
-           {
-               *newline = '\0';
-           } */
-
         Message requestMessage = parseRequestString(requestBuffer);
 
-        if(quit) {
-            printf("QUITTING THE CLIENT");
+         if(requestMessage.messageType == QUIT) {
+            quit = true;
             break;
         }
 
         requestMessage.id = thread_id;
-        printf("Message Parsed for client thread %d \n", thread_id);
+        if(dlevel == 1) {
+            printf("Message %s sent for client thread %d \n", requestBuffer,thread_id);
+        }
 
         if (mq_send(mq1, (const char *)&requestMessage, sizeof(Message), 0) == -1)
         {
@@ -141,31 +130,27 @@ void *clientWorker(void *arg)
 
         if(requestMessage.messageType == QUITSERVER) {
             quit = true;
-            break;
+            pthread_exit(NULL);
         }
         pthread_mutex_lock(&response_mutex[thread_id]);
 
         while (responseQueues[thread_id].front == NULL)
         {
-            if(dlevel == 1) {
-                printf(" thread %d wait for response \n", thread_id);
-            }
+       
             pthread_cond_wait(&response_cond[thread_id], &response_mutex[thread_id]);
         }
 
         Message responseMessage = dequeue(&responseQueues[thread_id]);
 
-        if ( dlevel == 1) {
-            printf(" thread %d acquired response \n", thread_id);
-        }
-
-        if(responseMessage.success) {
-            printf("Request %s returned succesfully \n",requestBuffer);
-        }else{
-            printf("Request %s failed\n",requestBuffer);
-        }
-        if(responseMessage.messageType == GET_REQUEST) {
-            printf("Value %s got from server for key %d\n",responseMessage.value,responseMessage.key);
+        if(dlevel ==1 ) {
+            if(responseMessage.success) {
+                printf("Request %s returned succesfully \n",requestBuffer);
+            }else{
+                printf("Request %s failed\n",requestBuffer);
+            }
+            if(responseMessage.messageType == GET_REQUEST) {
+                printf("Value %s got from server for key %d\n",responseMessage.value,responseMessage.key);
+            }
         }
 
         pthread_mutex_unlock(&response_mutex[thread_id]);
@@ -276,9 +261,7 @@ int main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 
-        printf("File opened");
-        printf(filename);
-        printf("\n");
+
     }
 
     for (int i = 0; i < clicount; ++i)
@@ -292,12 +275,7 @@ int main(int argc, char *argv[])
         initQueue(&responseQueues[i]);
     }
 
-    pthread_t frontendThread;
-    if (pthread_create(&frontendThread, NULL, frontend, NULL) != 0)
-    {
-        perror("Error creating frontend thread");
-        exit(EXIT_FAILURE);
-    }
+ 
 
     int thread_ids[clicount];
     pthread_t clientThreads[MAX_CLIENTS];
@@ -309,6 +287,13 @@ int main(int argc, char *argv[])
             perror("Error creating client thread");
             exit(EXIT_FAILURE);
         }
+    }
+
+       pthread_t frontendThread;
+    if (pthread_create(&frontendThread, NULL, frontend, NULL) != 0)
+    {
+        perror("Error creating frontend thread");
+        exit(EXIT_FAILURE);
     }
 
     pthread_join(frontendThread, NULL);

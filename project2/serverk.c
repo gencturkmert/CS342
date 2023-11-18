@@ -32,6 +32,8 @@ int buffer_size = 0;
 int deletion_marker = -1;
 bool should_exit = false;
 
+
+
 HashTable globalHashTables[MAX_FILES];
 
 mqd_t mq1, mq2;
@@ -48,6 +50,10 @@ void *worker(void *arg)
         {
             printf("Worker thread %d waits for signal\n", thread_id);
 
+            if(should_exit) {
+                pthread_exit(NULL);
+            }
+
             pthread_cond_wait(&mq1_full, &buffer_mutex);
         }
 
@@ -55,17 +61,12 @@ void *worker(void *arg)
         long int key = buffer[front].key;
         char *value =(char*)malloc(vsize);
         strncpy(value,buffer[front].value,vsize);
-        bool quit = buffer[front].quit;
         int id = buffer[front].id;
 
         printf("Worker thread %d received request for %d\n", thread_id, messageType);
         printf("Key %d\n", key);
         printf("Value %s\n",value);
         printf("Client ID: %d\n",id);
-
-        if(quit) {
-            should_exit = true;
-        }
 
         int file_index = (key % dcount);
 
@@ -75,7 +76,6 @@ void *worker(void *arg)
         pthread_mutex_unlock(&buffer_mutex);
 
         pthread_mutex_lock(&file_mutex[file_index]);
-        printf("File mutex acquired &d\n",file_index);
 
         switch (messageType)
         {
@@ -125,7 +125,6 @@ void *worker(void *arg)
             Message responseMessage;
             memset(&responseMessage, 0, sizeof(Message));
             responseMessage.isServer = true;
-            responseMessage.quit = false;
             responseMessage.messageType = PUT_REQUEST;
             responseMessage.success = true;
             responseMessage.valueSize = 0;
@@ -155,7 +154,6 @@ void *worker(void *arg)
 
                 Message responseMessage;
                 responseMessage.isServer = true;
-                responseMessage.quit = false;
                 responseMessage.messageType = DELETE_REQUEST;
                 responseMessage.success = true;
                 responseMessage.valueSize = 0;
@@ -175,7 +173,6 @@ void *worker(void *arg)
             {
                 Message responseMessage;
                 responseMessage.isServer = true;
-                responseMessage.quit = false;
                 responseMessage.messageType = DELETE_REQUEST;
                 responseMessage.success = false;
                 responseMessage.valueSize = 0;
@@ -208,7 +205,6 @@ void *worker(void *arg)
 
                 Message responseMessage;
                 responseMessage.isServer = true;
-                responseMessage.quit = false;
                 responseMessage.messageType = GET_REQUEST;
                 responseMessage.success = true;
                 responseMessage.valueSize = vsize;
@@ -229,7 +225,6 @@ void *worker(void *arg)
             {
                 Message responseMessage;
                 responseMessage.isServer = true;
-                responseMessage.quit = false;
                 responseMessage.messageType = GET_REQUEST;
                 responseMessage.success = false;
                 responseMessage.valueSize = 0;
@@ -258,9 +253,11 @@ void *worker(void *arg)
                 exit(EXIT_FAILURE);
             }
 
+            printf("-------DUMP-------\n");
             for (int i = 0; i < dcount; ++i)
             {
                 FILE *binaryFile = filePointers[i];
+                fseek(binaryFile,0,SEEK_SET);
 
                 if (binaryFile == NULL)
                 {
@@ -270,15 +267,16 @@ void *worker(void *arg)
 
                 long int k;
                 char *val = (char *)malloc(vsize);
-
+                printf("File %d:\n",i+1);
                 while (fread(&k, sizeof(long int), 1, binaryFile) == 1)
                 {
-                    if (k == -1)
+                    if (k <1 || k == 4294967295)
                     {
                         // Treat the key-value pair as deleted, seek to the next key offset
                         fseek(binaryFile, vsize, SEEK_CUR);
                         continue;
                     }
+
 
                     fread(val, vsize, 1, binaryFile);
                     fprintf(outputFile, "Key: %ld, Value: %s\n", k, val);
@@ -288,6 +286,25 @@ void *worker(void *arg)
             }
 
             fclose(outputFile);
+
+            Message responseMessage;
+            responseMessage.isServer = true;
+            responseMessage.messageType = DUMP;
+            responseMessage.success = true;
+            responseMessage.valueSize = 0;
+            responseMessage.key = -1;;
+            strncpy(responseMessage.value,"",vsize);
+            responseMessage.id = id;
+
+            if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
+            {
+                printf("Error sending failed DUMP_RESPONSE message to mq2");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        }
+        case QUITSERVER: {
+            should_exit = true;
             break;
         }
    
@@ -315,7 +332,6 @@ void *frontend(void *arg)
         if (mq_receive(mq1, (char *)&newMessage, sizeof(Message), NULL) > 0)
         {
             pthread_mutex_lock(&buffer_mutex);
-            printf("Server frontend accquired buffer lock buffer lock\\n");
 
             printf("Server received message\n");
             while (buffer_size == BUFFER_SIZE)
@@ -333,10 +349,12 @@ void *frontend(void *arg)
         }
     }
 
+    pthread_cond_broadcast(&mq1_full);
     pthread_mutex_unlock(&buffer_mutex);
-
     pthread_exit(NULL);
 }
+
+
 
 int main(int argc, char *argv[])
 {
@@ -443,9 +461,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    pthread_t worker_threads[tcount];
+    pthread_t worker_threads[MAX_FILES];
     pthread_t frontend_thread;
-
     int thread_ids[tcount];
 
     for (int i = 0; i < tcount; ++i)
