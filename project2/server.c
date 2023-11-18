@@ -240,8 +240,42 @@ void *worker(void *arg)
 
             break;
         }
+        case DUMP {
+            FILE *outputFile = fopen(value, "w");
 
-        default:
+            if (outputFile == NULL) {
+                perror("Error opening output file");
+                exit(EXIT_FAILURE);
+            }
+
+            for (int i = 0; i < dcount; ++i) {
+                FILE *binaryFile = filePointers[i];
+
+                if (binaryFile == NULL) {
+                    fprintf(stderr, "Error: File pointer at index %d is NULL\n", i);
+                    continue;
+                }
+
+                long int k;
+                char *val = (char *)malloc(vsize);
+
+                while (fread(&k, sizeof(long int), 1, binaryFile) == 1) {
+                    if (k == -1) {
+                        // Treat the key-value pair as deleted, seek to the next key offset
+                        fseek(binaryFile, vsize, SEEK_CUR);
+                        continue;
+                    }
+
+                    fread(val, vsize, 1, binaryFile);
+                    fprintf(outputFile, "Key: %ld, Value: %s\n", k, val);
+                }
+
+                free(value);
+            }
+
+            fclose(outputFile);
+            break;
+        } default:
             printf("Error: Invalid message type");
             break;
         }

@@ -18,6 +18,8 @@ pthread_cond_t response_cond[MAX_CLIENTS];
 char fname[256];
 int vsize;
 FILE *filePointers[MAX_CLIENTS];
+int dlevel;
+int clicount;
 
 Message parseRequestString(const char *requestString)
 {
@@ -66,8 +68,12 @@ Message parseRequestString(const char *requestString)
     }
     else if (strcmp(typeStr, "DUMP") == 0)
     {
-        message.dump = 1;
-        message.messageType = -1; // Set an indicator for dump
+        message.messageType = DUMP;
+        if (sscanf(requestString, "%*s %s", message.value) < 1)
+        {
+            fprintf(stderr, "Error parsing DUMP request string: %s\n", requestString);
+            exit(EXIT_FAILURE);
+        }
     }
     else
     {
@@ -120,9 +126,6 @@ void *clientWorker(void *arg)
         {
             free(requestMessage.value);
         }
-
-        // Process the responseMessage as needed
-        // ...
     }
 
     pthread_exit(NULL);
@@ -157,17 +160,14 @@ void *frontend(void *arg)
 
 int main(int argc, char *argv[])
 {
-    // Check if the number of arguments is correct
     if (argc != 12)
     {
         printf("Usage: ./clientk -n <clicount> -f <fname> -s <vsize> -m <mqname> -d <dlevel>\n");
         exit(EXIT_FAILURE);
     }
 
-    int clicount, vsize, dlevel;
     char mqname[256];
 
-    // Parse command line arguments
     for (int i = 1; i < argc; i += 2)
     {
         if (i + 1 >= argc)
