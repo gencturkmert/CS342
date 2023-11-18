@@ -4,6 +4,7 @@
 #define QUEUE_H
 
 #include "shared_defs.h"
+#include <string.h>
 
 typedef struct ResponseNode
 {

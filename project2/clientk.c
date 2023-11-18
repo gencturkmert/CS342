@@ -20,6 +20,7 @@ int vsize;
 FILE *filePointers[MAX_CLIENTS];
 int dlevel;
 int clicount;
+ResponseQueue responseQueues[MAX_CLIENTS];
 
 Message parseRequestString(const char *requestString)
 {
@@ -31,7 +32,7 @@ Message parseRequestString(const char *requestString)
     if (sscanf(requestString, "%s", typeStr) < 1)
     {
         fprintf(stderr, "Error parsing request string: %s\n", requestString);
-        return NULL;
+        EXIT(NULL);
     }
 
     if (strcmp(typeStr, "GET") == 0)
@@ -40,7 +41,8 @@ Message parseRequestString(const char *requestString)
         if (sscanf(requestString, "%*s %ld", &(message.key)) < 1)
         {
             fprintf(stderr, "Error parsing GET request string: %s\n", requestString);
-            return NULL;
+            EXIT(NULL);
+
         }
     }
     else if (strcmp(typeStr, "PUT") == 0)
@@ -49,7 +51,7 @@ Message parseRequestString(const char *requestString)
         if (sscanf(requestString, "%*s %ld %s", &(message.key), message.value))
         {
             fprintf(stderr, "Error parsing PUT request string: %s\n", requestString);
-            return NULL;
+            EXIT(NULL);
         }
     }
     else if (strcmp(typeStr, "DEL") == 0)
@@ -58,7 +60,8 @@ Message parseRequestString(const char *requestString)
         if (sscanf(requestString, "%*s %ld", &(message.key)) < 1)
         {
             fprintf(stderr, "Error parsing DELETE request string: %s\n", requestString);
-            return NULL;
+            EXIT(NULL);
+
         }
     }
     else if (strcmp(typeStr, "QUITSERVER") == 0)
@@ -73,13 +76,15 @@ Message parseRequestString(const char *requestString)
         if (sscanf(requestString, "%*s %s", message.value) < 1)
         {
             fprintf(stderr, "Error parsing DUMP request string: %s\n", requestString);
-            exit(EXIT_FAILURE);
+            EXIT(NULL);
+
         }
     }
     else
     {
         fprintf(stderr, "Unknown request type in string: %s\n", requestString);
-        return NULL;
+        EXIT(NULL);
+
     }
 
     return message;
@@ -226,7 +231,7 @@ int main(int argc, char *argv[])
     for (int i = 0; i < clicount; ++i)
     {
         char filename[256];
-        snprintf(filename, sizeof(filename), "%s%d", fname, i + 1);
+        snprintf(filename, sizeof(filename), "%s%d%s", fname, i + 1,".txt");
 
         filePointers[i] = fopen(filename, "r");
         if (filePointers[i] == NULL)
@@ -243,6 +248,10 @@ int main(int argc, char *argv[])
     {
         pthread_mutex_init(&response_mutex[i], NULL);
         pthread_cond_init(&response_cond[i], NULL);
+        ResponseQueue q;
+        initQueue(&q);
+        responseQueues[i] = q;
+
     }
 
     ResponseQueue responseQueues[MAX_CLIENTS];

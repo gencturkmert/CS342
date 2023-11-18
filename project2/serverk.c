@@ -59,7 +59,7 @@ void *worker(void *arg)
             should_exit = true;
         }
 
-        int file_index = (message.key % dcount);
+        int file_index = (key % dcount);
 
         front = (front + 1) % BUFFER_SIZE;
         buffer_size--;
@@ -289,7 +289,7 @@ void *worker(void *arg)
 
         pthread_mutex_unlock(&file_mutex[file_index]);
 
-        printf("Worker Thread %d is processing Message ID: %d\n", thread_id, message.messageType);
+        printf("Worker Thread %d is processing Message ID: %d\n", thread_id, messageType);
         pthread_cond_signal(&mq1_empty);
     }
 
