@@ -45,7 +45,7 @@ Message parseRequestString(const char *requestString)
     else if (strcmp(typeStr, "PUT") == 0)
     {
         message.messageType = PUT_REQUEST;
-        if (sscanf(requestString, "%*s %ld %s", &(message.key), message.value) < 2)
+        if (sscanf(requestString, "%*s %ld %s", &(message.key), message.value))
         {
             fprintf(stderr, "Error parsing PUT request string: %s\n", requestString);
             return NULL;
@@ -233,6 +233,9 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Failed to open file: %s\n", filename);
             exit(EXIT_FAILURE);
         }
+
+        printf("File opened");
+        printf(filename);
     }
 
     for (int i = 0; i < clicount; ++i)
