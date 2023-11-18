@@ -45,6 +45,8 @@ void *worker(void *arg)
 
         while (buffer_size == 0)
         {
+            printf("Worker thread %d waits for signal\n", thread_id);
+
             pthread_cond_wait(&mq1_full, &buffer_mutex);
         }
 
@@ -53,6 +55,8 @@ void *worker(void *arg)
         char *value = buffer[front].value;
         bool quit = buffer[front].quit;
         int id = buffer[front].id;
+
+        printf("Worker thread %d received request for %d\n", thread_id, messageType);
 
         if (quit)
         {
@@ -305,11 +309,13 @@ void *frontend(void *arg)
         Message newMessage;
         if (mq_receive(mq1, (char *)&newMessage, sizeof(Message), NULL) > 0)
         {
+            pthread_mutex_lock(&buffer_mutex);
+
+            printf("Server received message\n");
             while (buffer_size == BUFFER_SIZE)
             {
-                pthread_mutex_unlock(&buffer_mutex);
+                printf("Server message buffer is full\n");
                 pthread_cond_wait(&mq1_empty, &buffer_mutex);
-                pthread_mutex_lock(&buffer_mutex);
             }
 
             buffer[rear] = newMessage;
@@ -317,6 +323,7 @@ void *frontend(void *arg)
             buffer_size++;
 
             pthread_cond_signal(&mq1_full);
+            pthread_mutex_unlock(&buffer_mutex);
         }
     }
 

@@ -41,26 +41,19 @@ Message parseRequestString(const char *requestString)
         if (sscanf(requestString, "%*s %ld", &(message.key)) < 1)
         {
             fprintf(stderr, "Error parsing GET request string: %s\n", requestString);
-        exit(EXIT_FAILURE);
-
+            exit(EXIT_FAILURE);
         }
     }
     else if (strcmp(typeStr, "PUT") == 0)
     {
-        char* v;
+        char *v;
         message.messageType = PUT_REQUEST;
         int cc = sscanf(requestString, "%*s %ld %s", &(message.key), v);
-        fprintf(stderr,"key: %d\n",message.key);
-        printf("Value: %s\n", v);
-        fprintf(stderr," count %d",cc);
-
         message.value = v;
-        printf("Value: %s\n", message.value);
-        if (cc<2)
+        if (cc < 2)
         {
             fprintf(stderr, "Error parsing PUT request string: %s\n", requestString);
-                    exit(EXIT_FAILURE);
-
+            exit(EXIT_FAILURE);
         }
     }
     else if (strcmp(typeStr, "DEL") == 0)
@@ -69,9 +62,7 @@ Message parseRequestString(const char *requestString)
         if (sscanf(requestString, "%*s %ld", &(message.key)) < 1)
         {
             fprintf(stderr, "Error parsing DELETE request string: %s\n", requestString);
-                    exit(EXIT_FAILURE);
-
-
+            exit(EXIT_FAILURE);
         }
     }
     else if (strcmp(typeStr, "QUITSERVER") == 0)
@@ -83,20 +74,19 @@ Message parseRequestString(const char *requestString)
     else if (strcmp(typeStr, "DUMP") == 0)
     {
         message.messageType = DUMP;
-        if (sscanf(requestString, "%*s %s", message.value) < 1)
+        char *v;
+        int cc = sscanf(requestString, "%*s %s", v);
+        message.value = v;
+        if (cc < 1)
         {
             fprintf(stderr, "Error parsing DUMP request string: %s\n", requestString);
-                    exit(EXIT_FAILURE);
-
-
+            exit(EXIT_FAILURE);
         }
     }
     else
     {
         fprintf(stderr, "Unknown request type in string: %s\n", requestString);
-                exit(EXIT_FAILURE);
-
-
+        exit(EXIT_FAILURE);
     }
 
     return message;
@@ -115,14 +105,15 @@ void *clientWorker(void *arg)
             break;
         }
 
-     /*    char *newline = strchr(requestBuffer, '\n');
-        if (newline != NULL)
-        {
-            *newline = '\0';
-        } */
+        /*    char *newline = strchr(requestBuffer, '\n');
+           if (newline != NULL)
+           {
+               *newline = '\0';
+           } */
 
         Message requestMessage = parseRequestString(requestBuffer);
         requestMessage.id = thread_id;
+        printf("Message Parsed for client thread %d \n", thread_id);
 
         if (mq_send(mq1, (const char *)&requestMessage, sizeof(Message), 0) == -1)
         {
@@ -130,13 +121,16 @@ void *clientWorker(void *arg)
             exit(EXIT_FAILURE);
         }
         pthread_mutex_lock(&response_mutex[thread_id]);
+        printf("Lock acquired for thread %d \n", thread_id);
 
         while (responseQueues[thread_id].front == NULL)
         {
+            printf(" thread %d wait for response \n", thread_id);
             pthread_cond_wait(&response_cond[thread_id], &response_mutex[thread_id]);
         }
 
         Message responseMessage = dequeue(&responseQueues[thread_id]);
+        printf(" thread %d acquired response \n", thread_id);
 
         pthread_mutex_unlock(&response_mutex[thread_id]);
 
@@ -147,7 +141,6 @@ void *clientWorker(void *arg)
     }
 
     pthread_exit(NULL);
-
 }
 
 void *frontend(void *arg)
@@ -157,25 +150,19 @@ void *frontend(void *arg)
         Message responseMessage;
         if (mq_receive(mq2, (char *)&responseMessage, sizeof(Message), NULL) > 0)
         {
-            // Extract the thread ID from the response message
             int thread_id = responseMessage.id;
 
-            // Lock the mutex for the corresponding client thread
             pthread_mutex_lock(&response_mutex[thread_id]);
 
-            // Enqueue the response message into the corresponding queue
             enqueue(&responseQueues[thread_id], responseMessage);
 
-            // Signal or broadcast to wake up the corresponding client thread
             pthread_cond_signal(&response_cond[thread_id]);
 
-            // Unlock the mutex for the corresponding client thread
             pthread_mutex_unlock(&response_mutex[thread_id]);
         }
     }
 
     pthread_exit(NULL);
-
 }
 
 int main(int argc, char *argv[])
@@ -245,7 +232,7 @@ int main(int argc, char *argv[])
     for (int i = 0; i < clicount; ++i)
     {
         char filename[256];
-        snprintf(filename, sizeof(filename), "%s%d%s", fname, i + 1,".txt");
+        snprintf(filename, sizeof(filename), "%s%d%s", fname, i + 1, ".txt");
 
         filePointers[i] = fopen(filename, "r");
         if (filePointers[i] == NULL)
@@ -263,15 +250,9 @@ int main(int argc, char *argv[])
     {
         pthread_mutex_init(&response_mutex[i], NULL);
         pthread_cond_init(&response_cond[i], NULL);
-        ResponseQueue q;
-        initQueue(&q);
-        responseQueues[i] = q;
-
     }
 
-    ResponseQueue responseQueues[MAX_CLIENTS];
-
-    for (int i = 0; i < MAX_CLIENTS; ++i)
+    for (int i = 0; i < clicount; ++i)
     {
         initQueue(&responseQueues[i]);
     }
