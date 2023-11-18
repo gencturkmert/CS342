@@ -16,18 +16,13 @@ void initHashTable(HashTable *hashTable, size_t size)
         hashTable->table[i].offset = -1;
     }
 
-    if (pthread_mutex_init(&(hashTable->table_mutex), NULL) != 0)
-    {
-        printf("Error initializing hash table mutex");
-        exit(EXIT_FAILURE);
-    }
+
 }
 
 void updateHashTable(HashTable *hashTable, long int key, size_t fileOffset)
 {
     size_t hash = key % hashTable->table_size;
 
-    pthread_mutex_lock(&(hashTable->table_mutex));
 
     size_t i = hash;
     while (hashTable->table[i].key != -1 && hashTable->table[i].key != key)
@@ -38,14 +33,12 @@ void updateHashTable(HashTable *hashTable, long int key, size_t fileOffset)
     hashTable->table[i].key = key;
     hashTable->table[i].offset = fileOffset;
 
-    pthread_mutex_unlock(&(hashTable->table_mutex));
 }
 
 size_t getOffsetForKey(const long int key, const HashTable *hashTable)
 {
     size_t hash = key % hashTable->table_size;
 
-    pthread_mutex_lock(&(hashTable->table_mutex));
 
     size_t i = hash;
     while (hashTable->table[i].key != -1 && hashTable->table[i].key != key)
@@ -55,7 +48,6 @@ size_t getOffsetForKey(const long int key, const HashTable *hashTable)
 
     size_t offset = (hashTable->table[i].key == key) ? hashTable->table[i].offset : -1;
 
-    pthread_mutex_unlock(&(hashTable->table_mutex));
 
     return offset;
 }

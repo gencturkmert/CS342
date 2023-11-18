@@ -18,7 +18,6 @@ typedef struct
 {
     size_t table_size;
     DataItem *table;             // An array to store file offsets (positions) based on hashed keys
-    pthread_mutex_t table_mutex; // Mutex for synchronization
 } HashTable;
 
 // Function declarations

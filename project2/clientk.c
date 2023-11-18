@@ -46,15 +46,17 @@ Message parseRequestString(const char *requestString)
     }
     else if (strcmp(typeStr, "PUT") == 0)
     {
-        char *v;
+        char *v = malloc(vsize);
         message.messageType = PUT_REQUEST;
         int cc = sscanf(requestString, "%*s %ld %s", &(message.key), v);
-        message.value = v;
+        strncpy(message.value,v,sizeof(message.value)-1);
         if (cc < 2)
         {
             fprintf(stderr, "Error parsing PUT request string: %s\n", requestString);
             exit(EXIT_FAILURE);
         }
+
+        printf("Message VAl: %s\n",message.value);
     }
     else if (strcmp(typeStr, "DEL") == 0)
     {
@@ -76,7 +78,7 @@ Message parseRequestString(const char *requestString)
         message.messageType = DUMP;
         char *v;
         int cc = sscanf(requestString, "%*s %s", v);
-        message.value = v;
+        strncpy(message.value,v,vsize);
         if (cc < 1)
         {
             fprintf(stderr, "Error parsing DUMP request string: %s\n", requestString);
@@ -134,10 +136,7 @@ void *clientWorker(void *arg)
 
         pthread_mutex_unlock(&response_mutex[thread_id]);
 
-        if (requestMessage.messageType == PUT_REQUEST)
-        {
-            free(requestMessage.value);
-        }
+      
     }
 
     pthread_exit(NULL);

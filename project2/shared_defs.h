@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 
-#define MAX_KEY_SIZE 1024
+#define MAX_VAL_SIZE 256
 #define MESSAGE_SIZE sizeof(struct msg_buffer)
 
 
@@ -25,7 +25,7 @@ typedef struct
     size_t keySize;
     size_t valueSize;
     long int key;
-    char *value;
+    char value[MAX_VAL_SIZE];
     int id;
 } Message;
 

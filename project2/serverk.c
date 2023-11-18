@@ -4,6 +4,7 @@
 #include <mqueue.h>
 #include <pthread.h>
 #include <fcntl.h>
+#include <string.h>
 #include "shared_defs.h"
 #include "hash_table.h"
 
@@ -52,11 +53,15 @@ void *worker(void *arg)
 
         MessageType messageType = buffer[front].messageType;
         long int key = buffer[front].key;
-        char *value = buffer[front].value;
+        char *value =(char*)malloc(vsize);
+        strncpy(value,buffer[front].value,vsize);
         bool quit = buffer[front].quit;
         int id = buffer[front].id;
 
         printf("Worker thread %d received request for %d\n", thread_id, messageType);
+        printf("Key %d\n", key);
+        printf("Value %s\n",value);
+        printf("Client ID: %d\n",id);
 
         if (quit)
         {
@@ -71,6 +76,7 @@ void *worker(void *arg)
         pthread_mutex_unlock(&buffer_mutex);
 
         pthread_mutex_lock(&file_mutex[file_index]);
+        printf("File mutex acquired &d\n",file_index);
 
         switch (messageType)
         {
@@ -81,6 +87,7 @@ void *worker(void *arg)
 
             if (offset != -1)
             {
+                printf("Key %ld not found\n",key);
                 if (strlen(value) < vsize)
                 {
                     fwrite(value, sizeof(char), strlen(value), file);
@@ -116,6 +123,7 @@ void *worker(void *arg)
             }
 
             Message responseMessage;
+            memset(&responseMessage, 0, sizeof(Message));
             responseMessage.isServer = true;
             responseMessage.quit = false;
             responseMessage.messageType = PUT_REQUEST;
@@ -123,7 +131,7 @@ void *worker(void *arg)
             responseMessage.keySize = sizeof(long int);
             responseMessage.valueSize = 0;
             responseMessage.key = key;
-            responseMessage.value = NULL;
+            strncpy(responseMessage.value,"",vsize);
             responseMessage.id = id;
 
             if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
@@ -153,7 +161,7 @@ void *worker(void *arg)
                 responseMessage.keySize = sizeof(long int);
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
-                responseMessage.value = NULL;
+                strncpy(responseMessage.value,"",vsize);
                 responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
@@ -174,7 +182,7 @@ void *worker(void *arg)
                 responseMessage.keySize = sizeof(long int);
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
-                responseMessage.value = NULL;
+                strncpy(responseMessage.value,"",vsize);
                 responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
@@ -197,8 +205,8 @@ void *worker(void *arg)
                 FILE *file = filePointers[file_index];
                 fseek(file, offset, SEEK_SET);
 
-                char *value = (char *)malloc(vsize);
-                fread(value, sizeof(char), vsize, file);
+                char *getValue = (char *)malloc(vsize);
+                fread(getValue, sizeof(char), vsize, file);
 
                 Message responseMessage;
                 responseMessage.isServer = true;
@@ -208,7 +216,7 @@ void *worker(void *arg)
                 responseMessage.keySize = sizeof(long int);
                 responseMessage.valueSize = vsize;
                 responseMessage.key = key;
-                responseMessage.value = value;
+                strncpy(responseMessage.value,getValue,vsize);
                 responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
@@ -230,7 +238,7 @@ void *worker(void *arg)
                 responseMessage.keySize = sizeof(long int);
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
-                responseMessage.value = NULL;
+                strncpy(responseMessage.value,"",vsize);
                 responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
@@ -406,7 +414,7 @@ int main(int argc, char *argv[])
     for (int i = 1; i <= dcount; ++i)
     {
         char filename[256];
-        snprintf(filename, sizeof(filename), "%s%d", fname, i);
+        snprintf(filename, sizeof(filename), "%s%d%s", fname, i, ".bin");
 
         filePointers[i - 1] = fopen(filename, "ab+");
         if (filePointers[i - 1] == NULL)
