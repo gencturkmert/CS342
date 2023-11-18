@@ -13,7 +13,8 @@ typedef enum
     DUMP,
     PUT_REQUEST,
     DELETE_REQUEST,
-    GET_REQUEST
+    GET_REQUEST,
+    QUITSERVER
 } MessageType;
 
 typedef struct
@@ -22,7 +23,6 @@ typedef struct
     bool quit;
     MessageType messageType;
     bool success;
-    size_t keySize;
     size_t valueSize;
     long int key;
     char value[MAX_VAL_SIZE];

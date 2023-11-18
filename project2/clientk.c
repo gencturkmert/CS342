@@ -21,12 +21,19 @@ FILE *filePointers[MAX_CLIENTS];
 int dlevel;
 int clicount;
 ResponseQueue responseQueues[MAX_CLIENTS];
+bool quit = false;
 
 Message parseRequestString(const char *requestString)
 {
     Message message;
     memset(&message, 0, sizeof(Message));
-    printf(requestString);
+    message.isServer = 0;
+    message.quit = 0;
+    message.quit = 0;
+    
+    if(dlevel ==1 ) {
+        printf(requestString);
+    }
 
     char typeStr[20];
     if (sscanf(requestString, "%s", typeStr) < 1)
@@ -49,12 +56,12 @@ Message parseRequestString(const char *requestString)
         char *v = malloc(vsize);
         message.messageType = PUT_REQUEST;
         int cc = sscanf(requestString, "%*s %ld %s", &(message.key), v);
-        strncpy(message.value,v,sizeof(message.value)-1);
         if (cc < 2)
         {
             fprintf(stderr, "Error parsing PUT request string: %s\n", requestString);
             exit(EXIT_FAILURE);
         }
+        strncpy(message.value,v,sizeof(message.value)-1);
 
         printf("Message VAl: %s\n",message.value);
     }
@@ -69,21 +76,24 @@ Message parseRequestString(const char *requestString)
     }
     else if (strcmp(typeStr, "QUITSERVER") == 0)
     {
-        message.isServer = 1;
+        message.isServer = 0;
         message.quit = 1;
-        message.messageType = -1;
+        message.messageType = QUITSERVER;
+
+    }else if(strcmp(typeStr,"QUIT") == 0) {
+        quit = true;
     }
     else if (strcmp(typeStr, "DUMP") == 0)
     {
         message.messageType = DUMP;
-        char *v;
+        char *v = malloc(vsize);
         int cc = sscanf(requestString, "%*s %s", v);
-        strncpy(message.value,v,vsize);
         if (cc < 1)
         {
             fprintf(stderr, "Error parsing DUMP request string: %s\n", requestString);
             exit(EXIT_FAILURE);
         }
+        strncpy(message.value,v,vsize);
     }
     else
     {
@@ -98,7 +108,7 @@ void *clientWorker(void *arg)
 {
     int thread_id = *((int *)arg);
 
-    while (1)
+    while (!quit)
     {
         char requestBuffer[REQUEST_BUFFER_SIZE];
 
@@ -114,6 +124,12 @@ void *clientWorker(void *arg)
            } */
 
         Message requestMessage = parseRequestString(requestBuffer);
+
+        if(quit) {
+            printf("QUITTING THE CLIENT");
+            break;
+        }
+
         requestMessage.id = thread_id;
         printf("Message Parsed for client thread %d \n", thread_id);
 
@@ -122,17 +138,35 @@ void *clientWorker(void *arg)
             printf("Error sending request message to MQ1");
             exit(EXIT_FAILURE);
         }
+
+        if(requestMessage.messageType == QUITSERVER) {
+            quit = true;
+            break;
+        }
         pthread_mutex_lock(&response_mutex[thread_id]);
-        printf("Lock acquired for thread %d \n", thread_id);
 
         while (responseQueues[thread_id].front == NULL)
         {
-            printf(" thread %d wait for response \n", thread_id);
+            if(dlevel == 1) {
+                printf(" thread %d wait for response \n", thread_id);
+            }
             pthread_cond_wait(&response_cond[thread_id], &response_mutex[thread_id]);
         }
 
         Message responseMessage = dequeue(&responseQueues[thread_id]);
-        printf(" thread %d acquired response \n", thread_id);
+
+        if ( dlevel == 1) {
+            printf(" thread %d acquired response \n", thread_id);
+        }
+
+        if(responseMessage.success) {
+            printf("Request %s returned succesfully \n",requestBuffer);
+        }else{
+            printf("Request %s failed\n",requestBuffer);
+        }
+        if(responseMessage.messageType == GET_REQUEST) {
+            printf("Value %s got from server for key %d\n",responseMessage.value,responseMessage.key);
+        }
 
         pthread_mutex_unlock(&response_mutex[thread_id]);
 
@@ -144,7 +178,7 @@ void *clientWorker(void *arg)
 
 void *frontend(void *arg)
 {
-    while (1)
+    while (!quit)
     {
         Message responseMessage;
         if (mq_receive(mq2, (char *)&responseMessage, sizeof(Message), NULL) > 0)

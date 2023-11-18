@@ -63,8 +63,7 @@ void *worker(void *arg)
         printf("Value %s\n",value);
         printf("Client ID: %d\n",id);
 
-        if (quit)
-        {
+        if(quit) {
             should_exit = true;
         }
 
@@ -87,7 +86,7 @@ void *worker(void *arg)
 
             if (offset != -1)
             {
-                printf("Key %ld not found\n",key);
+                fseek(file,offset,SEEK_SET);
                 if (strlen(value) < vsize)
                 {
                     fwrite(value, sizeof(char), strlen(value), file);
@@ -103,6 +102,7 @@ void *worker(void *arg)
             }
             else
             {
+                printf("Key %d not found, inserting key\n",key);
                 fseek(file, 0, SEEK_END);
                 fwrite(&key, sizeof(long int), 1, file);
                 if (strlen(value) < vsize)
@@ -128,7 +128,6 @@ void *worker(void *arg)
             responseMessage.quit = false;
             responseMessage.messageType = PUT_REQUEST;
             responseMessage.success = true;
-            responseMessage.keySize = sizeof(long int);
             responseMessage.valueSize = 0;
             responseMessage.key = key;
             strncpy(responseMessage.value,"",vsize);
@@ -152,13 +151,13 @@ void *worker(void *arg)
                 FILE *file = filePointers[file_index];
                 fseek(file, offset - sizeof(long int), SEEK_SET);
                 fwrite(&deletion_marker, sizeof(long int), 1, file);
+                updateHashTable(&globalHashTables[file_index],key,-1);
 
                 Message responseMessage;
                 responseMessage.isServer = true;
                 responseMessage.quit = false;
                 responseMessage.messageType = DELETE_REQUEST;
                 responseMessage.success = true;
-                responseMessage.keySize = sizeof(long int);
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
                 strncpy(responseMessage.value,"",vsize);
@@ -179,7 +178,6 @@ void *worker(void *arg)
                 responseMessage.quit = false;
                 responseMessage.messageType = DELETE_REQUEST;
                 responseMessage.success = false;
-                responseMessage.keySize = sizeof(long int);
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
                 strncpy(responseMessage.value,"",vsize);
@@ -213,7 +211,6 @@ void *worker(void *arg)
                 responseMessage.quit = false;
                 responseMessage.messageType = GET_REQUEST;
                 responseMessage.success = true;
-                responseMessage.keySize = sizeof(long int);
                 responseMessage.valueSize = vsize;
                 responseMessage.key = key;
                 strncpy(responseMessage.value,getValue,vsize);
@@ -235,7 +232,6 @@ void *worker(void *arg)
                 responseMessage.quit = false;
                 responseMessage.messageType = GET_REQUEST;
                 responseMessage.success = false;
-                responseMessage.keySize = sizeof(long int);
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
                 strncpy(responseMessage.value,"",vsize);
@@ -288,12 +284,13 @@ void *worker(void *arg)
                     fprintf(outputFile, "Key: %ld, Value: %s\n", k, val);
                 }
 
-                free(value);
+                free(val);
             }
 
             fclose(outputFile);
             break;
         }
+   
         default:
             printf("Error: Invalid message type");
             break;
