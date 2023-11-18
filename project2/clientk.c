@@ -25,6 +25,7 @@ Message parseRequestString(const char *requestString)
 {
     Message message;
     memset(&message, 0, sizeof(Message));
+    printf(requestString);
 
     char typeStr[20];
     if (sscanf(requestString, "%s", typeStr) < 1)
