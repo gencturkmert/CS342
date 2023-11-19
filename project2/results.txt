@@ -4,7 +4,7 @@ fname: dat
 tcount: 5
 vsize: 32
 mqname: qq
-for 400 lines, 1 dump, 1 cli thread ->
+for 400 lines, 1 cli thread ->
 real    0m0,100s
 user    0m0,009s
 sys     0m0,015s
