@@ -1,0 +1,56 @@
+server-> 
+dcount: 2
+fname: dat
+tcount: 5
+vsize: 32
+mqname: qq
+for 400 lines, 1 dump, 1 cli thread ->
+real    0m0,100s
+user    0m0,009s
+sys     0m0,015s
+
+4 cli thread, each have 100 elemetns -> {
+
+real    0m0,066s
+user    0m0,007s
+sys     0m0,024s
+}
+
+---------------------------------
+For 4 client with 100s elements: 
+for server worker 5 -> {
+
+    real    0m0,066s
+    user    0m0,007s
+    sys     0m0,024s
+}
+for server worker 3 -> {
+    client times:
+        real    0m0,073s
+        user    0m0,007s
+        sys     0m0,023s
+}
+
+for server worker 1 -> {
+    real    0m0,084s
+    user    0m0,006s
+    sys     0m0,031s
+}
+
+-------------------------------
+server 3 - cli 4
+s 16 :
+    eal    0m0,070s
+    user    0m0,012s
+    sys     0m0,007s
+
+s32:
+    real    0m0,073s
+    user    0m0,007s
+    sys     0m0,023s
+
+s64:
+    real    0m0,073s
+    user    0m0,010s
+    sys     0m0,014s
+

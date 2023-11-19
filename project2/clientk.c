@@ -251,10 +251,7 @@ if(dlevel == 1) {
     {
         perror("Error opening message queues");
         exit(EXIT_FAILURE);
-    }else{
-        printf("Q opened %s and %s\n",mqname1,mqname2);
     }
-
 
     if(clicount == 0) {
 
