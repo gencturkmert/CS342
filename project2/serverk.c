@@ -33,7 +33,6 @@ int deletion_marker = 0;
 bool should_exit = false;
 pthread_cond_t quit_cond = PTHREAD_COND_INITIALIZER;
 
-
 HashTable globalHashTables[MAX_FILES];
 pthread_mutex_t quit_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -51,7 +50,8 @@ void *worker(void *arg)
         {
             printf("Worker thread %d waits for signal\n", thread_id);
 
-            if(should_exit) {
+            if (should_exit)
+            {
                 pthread_exit(NULL);
             }
 
@@ -60,14 +60,14 @@ void *worker(void *arg)
 
         MessageType messageType = buffer[front].messageType;
         long int key = buffer[front].key;
-        char *value =(char*)malloc(vsize);
-        strncpy(value,buffer[front].value,vsize);
+        char *value = (char *)malloc(vsize);
+        strncpy(value, buffer[front].value, vsize);
         int id = buffer[front].id;
 
         printf("Worker thread %d received request for %d\n", thread_id, messageType);
         printf("Key %d\n", key);
-        printf("Value %s\n",value);
-        printf("Client ID: %d\n",id);
+        printf("Value %s\n", value);
+        printf("Client ID: %d\n", id);
 
         int file_index = (key % dcount);
 
@@ -85,48 +85,48 @@ void *worker(void *arg)
             size_t offset = getOffsetForKey(key, &globalHashTables[file_index]);
             FILE *file = filePointers[file_index];
 
-            if (offset != -1) {
+            if (offset != -1)
+            {
 
                 fseek(file, offset - sizeof(long int), SEEK_SET);
                 fwrite(&deletion_marker, sizeof(long int), 1, file);
-                updateHashTable(&globalHashTables[file_index],key,-1);
-
-            } 
-           /*  {
-                fseek(file,offset,SEEK_SET);
-                if (strlen(value) < vsize)
-                {
-                    fwrite(value, sizeof(char), strlen(value), file);
-                    size_t remainingBytes = vsize - strlen(value);
-                    char nullBytes[remainingBytes];
-                    memset(nullBytes, 0, remainingBytes);
-                    fwrite(nullBytes, sizeof(char), remainingBytes, file);
-                }
-                else
-                {
-                    fwrite(value, sizeof(char), vsize, file);
-                }
-            } */
-            //else
+                updateHashTable(&globalHashTables[file_index], key, -1);
+            }
+            /*  {
+                 fseek(file,offset,SEEK_SET);
+                 if (strlen(value) < vsize)
+                 {
+                     fwrite(value, sizeof(char), strlen(value), file);
+                     size_t remainingBytes = vsize - strlen(value);
+                     char nullBytes[remainingBytes];
+                     memset(nullBytes, 0, remainingBytes);
+                     fwrite(nullBytes, sizeof(char), remainingBytes, file);
+                 }
+                 else
+                 {
+                     fwrite(value, sizeof(char), vsize, file);
+                 }
+             } */
+            // else
             //{
-                fseek(file, 0, SEEK_END);
-                fwrite(&key, sizeof(long int), 1, file);
-                if (strlen(value) < vsize)
-                {
-                    fwrite(value, sizeof(char), strlen(value), file);
-                    size_t remainingBytes = vsize - strlen(value);
-                    char nullBytes[remainingBytes];
-                    memset(nullBytes, 0, remainingBytes);
-                    fwrite(nullBytes, sizeof(char), remainingBytes, file);
-                }
-                else
-                {
-                    fwrite(value, sizeof(char), vsize, file);
-                }
+            fseek(file, 0, SEEK_END);
+            fwrite(&key, sizeof(long int), 1, file);
+            if (strlen(value) < vsize)
+            {
+                fwrite(value, sizeof(char), strlen(value), file);
+                size_t remainingBytes = vsize - strlen(value);
+                char nullBytes[remainingBytes];
+                memset(nullBytes, 0, remainingBytes);
+                fwrite(nullBytes, sizeof(char), remainingBytes, file);
+            }
+            else
+            {
+                fwrite(value, sizeof(char), vsize, file);
+            }
 
-                size_t newOffset = ftell(file) - vsize;
-                updateHashTable(&globalHashTables[file_index], key, newOffset);
-           // }
+            size_t newOffset = ftell(file) - vsize;
+            updateHashTable(&globalHashTables[file_index], key, newOffset);
+            // }
 
             Message responseMessage;
             memset(&responseMessage, 0, sizeof(Message));
@@ -135,7 +135,7 @@ void *worker(void *arg)
             responseMessage.success = true;
             responseMessage.valueSize = 0;
             responseMessage.key = key;
-            strncpy(responseMessage.value,"",vsize);
+            strncpy(responseMessage.value, "", vsize);
             responseMessage.id = id;
 
             if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
@@ -156,7 +156,7 @@ void *worker(void *arg)
                 FILE *file = filePointers[file_index];
                 fseek(file, offset - sizeof(long int), SEEK_SET);
                 fwrite(&deletion_marker, sizeof(long int), 1, file);
-                updateHashTable(&globalHashTables[file_index],key,-1);
+                updateHashTable(&globalHashTables[file_index], key, -1);
 
                 Message responseMessage;
                 responseMessage.isServer = true;
@@ -164,7 +164,7 @@ void *worker(void *arg)
                 responseMessage.success = true;
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
-                strncpy(responseMessage.value,"",vsize);
+                strncpy(responseMessage.value, "", vsize);
                 responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
@@ -183,7 +183,7 @@ void *worker(void *arg)
                 responseMessage.success = false;
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
-                strncpy(responseMessage.value,"",vsize);
+                strncpy(responseMessage.value, "", vsize);
                 responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
@@ -215,7 +215,7 @@ void *worker(void *arg)
                 responseMessage.success = true;
                 responseMessage.valueSize = vsize;
                 responseMessage.key = key;
-                strncpy(responseMessage.value,getValue,vsize);
+                strncpy(responseMessage.value, getValue, vsize);
                 responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
@@ -235,7 +235,7 @@ void *worker(void *arg)
                 responseMessage.success = false;
                 responseMessage.valueSize = 0;
                 responseMessage.key = key;
-                strncpy(responseMessage.value,"",vsize);
+                strncpy(responseMessage.value, "", vsize);
                 responseMessage.id = id;
 
                 if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
@@ -262,7 +262,7 @@ void *worker(void *arg)
             for (int i = 0; i < dcount; ++i)
             {
                 FILE *binaryFile = filePointers[i];
-                fseek(binaryFile,0,SEEK_SET);
+                fseek(binaryFile, 0, SEEK_SET);
 
                 if (binaryFile == NULL)
                 {
@@ -272,16 +272,15 @@ void *worker(void *arg)
 
                 long int k;
                 char *val = (char *)malloc(vsize);
-                printf("File %d:\n",i+1);
+                printf("File %d:\n", i + 1);
                 while (fread(&k, sizeof(long int), 1, binaryFile) == 1)
                 {
-                    if (k <1 || k == 4294967295)
+                    if (k < 1 || k == 4294967295)
                     {
                         // Treat the key-value pair as deleted, seek to the next key offset
                         fseek(binaryFile, vsize, SEEK_CUR);
                         continue;
                     }
-
 
                     fread(val, vsize, 1, binaryFile);
                     fprintf(outputFile, "Key: %ld, Value: %s\n", k, val);
@@ -297,8 +296,9 @@ void *worker(void *arg)
             responseMessage.messageType = DUMP;
             responseMessage.success = true;
             responseMessage.valueSize = 0;
-            responseMessage.key = -1;;
-            strncpy(responseMessage.value,"",vsize);
+            responseMessage.key = -1;
+            ;
+            strncpy(responseMessage.value, "", vsize);
             responseMessage.id = id;
 
             if (mq_send(mq2, (const char *)&responseMessage, sizeof(Message), 0) == -1)
@@ -308,7 +308,8 @@ void *worker(void *arg)
             }
             break;
         }
-        case QUITSERVER: {
+        case QUITSERVER:
+        {
             pthread_mutex_lock(&quit_mutex);
             pthread_cond_signal(&quit_cond);
             should_exit = true;
@@ -316,7 +317,7 @@ void *worker(void *arg)
             pthread_cond_signal(&mq1_empty);
             pthread_exit(NULL);
         }
-   
+
         default:
             printf("Error: Invalid message type");
             break;
@@ -325,7 +326,7 @@ void *worker(void *arg)
         pthread_mutex_unlock(&file_mutex[file_index]);
 
         printf("Worker Thread %d is processing Message ID: %d\n", thread_id, messageType);
-      
+
         pthread_cond_signal(&mq1_empty);
     }
 
@@ -358,7 +359,8 @@ void *frontend(void *arg)
             pthread_mutex_unlock(&buffer_mutex);
         }
 
-        if(should_exit) {
+        if (should_exit)
+        {
             pthread_exit(NULL);
         }
     }
@@ -367,8 +369,6 @@ void *frontend(void *arg)
     pthread_mutex_unlock(&buffer_mutex);
     pthread_exit(NULL);
 }
-
-
 
 int main(int argc, char *argv[])
 {
@@ -436,8 +436,10 @@ int main(int argc, char *argv[])
     {
         printf("Error opening message queues");
         exit(EXIT_FAILURE);
-    }else {
-        printf("Q opened %s and %s\n",mqname1,mqname2);
+    }
+    else
+    {
+        printf("Q opened %s and %s\n", mqname1, mqname2);
     }
 
     for (int i = 1; i <= dcount; ++i)
@@ -494,12 +496,11 @@ int main(int argc, char *argv[])
         printf("Error creating frontend thread");
         exit(EXIT_FAILURE);
     }
-    
+
     printf("WAITING FOR QUIT SIGNAL");
     pthread_mutex_lock(&quit_mutex);
-    pthread_cond_wait(&quit_cond,&quit_mutex);
+    pthread_cond_wait(&quit_cond, &quit_mutex);
     printf("QUIT SIGNAL RECEVIED");
-    
 
     for (int i = 0; i < dcount; ++i)
     {
@@ -512,9 +513,7 @@ int main(int argc, char *argv[])
     mq_close(mq1);
     mq_close(mq2);
 
-
     printf("SERVER EXIT");
-
 
     return 0;
 }

@@ -11,7 +11,6 @@
 #define MAX_CLIENTS 10
 #define REQUEST_BUFFER_SIZE 256
 
-// Global variables
 mqd_t mq1, mq2;
 pthread_mutex_t response_mutex[MAX_CLIENTS];
 pthread_cond_t response_cond[MAX_CLIENTS];
@@ -29,7 +28,6 @@ Message parseRequestString(const char *requestString)
     Message message;
     memset(&message, 0, sizeof(Message));
     message.isServer = 0;
-
 
     char typeStr[20];
     if (sscanf(requestString, "%s", typeStr) < 1)
@@ -57,8 +55,7 @@ Message parseRequestString(const char *requestString)
             fprintf(stderr, "Error parsing PUT request string: %s\n", requestString);
             exit(EXIT_FAILURE);
         }
-        strncpy(message.value,v,sizeof(message.value)-1);
-
+        strncpy(message.value, v, sizeof(message.value) - 1);
     }
     else if (strcmp(typeStr, "DEL") == 0)
     {
@@ -73,8 +70,9 @@ Message parseRequestString(const char *requestString)
     {
         message.isServer = 0;
         message.messageType = QUITSERVER;
-
-    }else if(strcmp(typeStr,"QUIT") == 0) {
+    }
+    else if (strcmp(typeStr, "QUIT") == 0)
+    {
         message.messageType = QUIT;
     }
     else if (strcmp(typeStr, "DUMP") == 0)
@@ -87,7 +85,7 @@ Message parseRequestString(const char *requestString)
             fprintf(stderr, "Error parsing DUMP request string: %s\n", requestString);
             exit(EXIT_FAILURE);
         }
-        strncpy(message.value,v,vsize);
+        strncpy(message.value, v, vsize);
     }
     else
     {
@@ -113,15 +111,17 @@ void *clientWorker(void *arg)
 
         Message requestMessage = parseRequestString(requestBuffer);
 
-         if(requestMessage.messageType == QUIT) {
+        if (requestMessage.messageType == QUIT)
+        {
             quit = true;
             pthread_cond_signal(&quit_cond);
             break;
         }
 
         requestMessage.id = thread_id;
-        if(dlevel == 1) {
-            printf("Message %s sent for client thread %d \n", requestBuffer,thread_id);
+        if (dlevel == 1)
+        {
+            printf("Message %s sent for client thread %d \n", requestBuffer, thread_id);
         }
 
         if (mq_send(mq1, (const char *)&requestMessage, sizeof(Message), 0) == -1)
@@ -130,7 +130,8 @@ void *clientWorker(void *arg)
             exit(EXIT_FAILURE);
         }
 
-        if(requestMessage.messageType == QUITSERVER) {
+        if (requestMessage.messageType == QUITSERVER)
+        {
             quit = true;
             pthread_cond_signal(&quit_cond);
             pthread_exit(NULL);
@@ -139,26 +140,29 @@ void *clientWorker(void *arg)
 
         while (responseQueues[thread_id].front == NULL)
         {
-       
+
             pthread_cond_wait(&response_cond[thread_id], &response_mutex[thread_id]);
         }
 
         Message responseMessage = dequeue(&responseQueues[thread_id]);
 
-        if(dlevel ==1 ) {
-            if(responseMessage.success) {
-                printf("Request %s returned succesfully \n",requestBuffer);
-            }else{
-                printf("Request %s failed\n",requestBuffer);
+        if (dlevel == 1)
+        {
+            if (responseMessage.success)
+            {
+                printf("Request %s returned succesfully \n", requestBuffer);
             }
-            if(responseMessage.messageType == GET_REQUEST) {
-                printf("Value %s got from server for key %d\n",responseMessage.value,responseMessage.key);
+            else
+            {
+                printf("Request %s failed\n", requestBuffer);
+            }
+            if (responseMessage.messageType == GET_REQUEST)
+            {
+                printf("Value %s got from server for key %d\n", responseMessage.value, responseMessage.key);
             }
         }
 
         pthread_mutex_unlock(&response_mutex[thread_id]);
-
-      
     }
 
     pthread_exit(NULL);
@@ -231,13 +235,14 @@ int main(int argc, char *argv[])
         }
     }
 
-if(dlevel == 1) {
-    printf("clicount: %d\n", clicount);
-    printf("fname: %s\n", fname);
-    printf("vsize: %d\n", vsize);
-    printf("mqname: %s\n", mqname);
-    printf("dlevel: %d\n", dlevel);
-}
+    if (dlevel == 1)
+    {
+        printf("clicount: %d\n", clicount);
+        printf("fname: %s\n", fname);
+        printf("vsize: %d\n", vsize);
+        printf("mqname: %s\n", mqname);
+        printf("dlevel: %d\n", dlevel);
+    }
 
     char mqname1[256], mqname2[256];
 
@@ -253,27 +258,31 @@ if(dlevel == 1) {
         exit(EXIT_FAILURE);
     }
 
-    if(clicount == 0) {
+    if (clicount == 0)
+    {
 
-        while(!quit) {
+        while (!quit)
+        {
 
             char input[256];
 
             printf("Enter a request: ");
-            
+
             fgets(input, sizeof(input), stdin);
 
             Message message = parseRequestString(input);
 
-            if(message.messageType == QUIT) {
+            if (message.messageType == QUIT)
+            {
                 quit = true;
                 pthread_cond_signal(&quit_cond);
                 break;
             }
 
             message.id = 0;
-            if(dlevel == 1) {
-                printf("Message %s sent \n", input); 
+            if (dlevel == 1)
+            {
+                printf("Message %s sent \n", input);
             }
 
             if (mq_send(mq1, (const char *)&message, sizeof(Message), 0) == -1)
@@ -282,12 +291,12 @@ if(dlevel == 1) {
                 exit(EXIT_FAILURE);
             }
 
-            if(message.messageType == QUITSERVER) {
+            if (message.messageType == QUITSERVER)
+            {
                 quit = true;
                 pthread_cond_signal(&quit_cond);
                 break;
             }
-
 
             bool loop = false;
             Message responseMessage;
@@ -299,22 +308,25 @@ if(dlevel == 1) {
                 }
             }
 
-
-
-            if(dlevel ==1 ) {
-                if(responseMessage.success) {
-                    printf("Request %s returned succesfully \n",input);
-                }else{
-                    printf("Request %s failed\n",input);
+            if (dlevel == 1)
+            {
+                if (responseMessage.success)
+                {
+                    printf("Request %s returned succesfully \n", input);
                 }
-                if(responseMessage.messageType == GET_REQUEST) {
-                    printf("Value %s got from server for key %d\n",responseMessage.value,responseMessage.key);
+                else
+                {
+                    printf("Request %s failed\n", input);
+                }
+                if (responseMessage.messageType == GET_REQUEST)
+                {
+                    printf("Value %s got from server for key %d\n", responseMessage.value, responseMessage.key);
                 }
             }
-
         }
-
-    }else{
+    }
+    else
+    {
 
         for (int i = 0; i < clicount; ++i)
         {
@@ -327,10 +339,7 @@ if(dlevel == 1) {
                 fprintf(stderr, "Failed to open file: %s\n", filename);
                 exit(EXIT_FAILURE);
             }
-
-
         }
-       
 
         for (int i = 0; i < clicount; ++i)
         {
@@ -342,8 +351,6 @@ if(dlevel == 1) {
         {
             initQueue(&responseQueues[i]);
         }
-
-    
 
         int thread_ids[clicount];
         pthread_t clientThreads[MAX_CLIENTS];
@@ -365,23 +372,21 @@ if(dlevel == 1) {
         }
 
         pthread_mutex_t quit_mutex = PTHREAD_MUTEX_INITIALIZER;
-        while(!quit) {
-            pthread_cond_wait(&quit_cond,&quit_mutex);
+        while (!quit)
+        {
+            pthread_cond_wait(&quit_cond, &quit_mutex);
         }
 
-           // Destroy condition variables
         for (int i = 0; i < clicount; ++i)
         {
             pthread_cond_destroy(&response_cond[i]);
         }
-    }   
+    }
 
     pthread_cond_destroy(&quit_cond);
     mq_close(mq1);
     mq_close(mq2);
     printf("CLIENT EXIT");
-
- 
 
     return 0;
 }

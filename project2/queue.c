@@ -11,12 +11,10 @@ void initQueue(ResponseQueue *queue)
 
 void enqueue(ResponseQueue *queue, Message responseMessage)
 {
-    // Create a new node for the response message
     ResponseNode *newNode = (ResponseNode *)malloc(sizeof(ResponseNode));
     newNode->responseMessage = responseMessage;
     newNode->next = NULL;
 
-    // Enqueue the node
     if (queue->rear == NULL)
     {
         queue->front = newNode;
