@@ -29,12 +29,13 @@ int front = 0;
 int rear = 0;
 int buffer_size = 0;
 
-int deletion_marker = -1;
+int deletion_marker = 0;
 bool should_exit = false;
 pthread_cond_t quit_cond = PTHREAD_COND_INITIALIZER;
 
 
 HashTable globalHashTables[MAX_FILES];
+pthread_mutex_t quit_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 mqd_t mq1, mq2;
 
@@ -84,8 +85,14 @@ void *worker(void *arg)
             size_t offset = getOffsetForKey(key, &globalHashTables[file_index]);
             FILE *file = filePointers[file_index];
 
-            if (offset != -1)
-            {
+            if (offset != -1) {
+
+                fseek(file, offset - sizeof(long int), SEEK_SET);
+                fwrite(&deletion_marker, sizeof(long int), 1, file);
+                updateHashTable(&globalHashTables[file_index],key,-1);
+
+            } 
+           /*  {
                 fseek(file,offset,SEEK_SET);
                 if (strlen(value) < vsize)
                 {
@@ -99,10 +106,9 @@ void *worker(void *arg)
                 {
                     fwrite(value, sizeof(char), vsize, file);
                 }
-            }
-            else
-            {
-                printf("Key %d not found, inserting key\n",key);
+            } */
+            //else
+            //{
                 fseek(file, 0, SEEK_END);
                 fwrite(&key, sizeof(long int), 1, file);
                 if (strlen(value) < vsize)
@@ -120,7 +126,7 @@ void *worker(void *arg)
 
                 size_t newOffset = ftell(file) - vsize;
                 updateHashTable(&globalHashTables[file_index], key, newOffset);
-            }
+           // }
 
             Message responseMessage;
             memset(&responseMessage, 0, sizeof(Message));
@@ -249,11 +255,10 @@ void *worker(void *arg)
 
             if (outputFile == NULL)
             {
-                perror("Error opening output file");
+                printf("Error opening output file");
                 exit(EXIT_FAILURE);
             }
 
-            printf("-------DUMP-------\n");
             for (int i = 0; i < dcount; ++i)
             {
                 FILE *binaryFile = filePointers[i];
@@ -304,9 +309,12 @@ void *worker(void *arg)
             break;
         }
         case QUITSERVER: {
+            pthread_mutex_lock(&quit_mutex);
             pthread_cond_signal(&quit_cond);
             should_exit = true;
-            break;
+            pthread_mutex_unlock(&quit_mutex);
+            pthread_cond_signal(&mq1_empty);
+            pthread_exit(NULL);
         }
    
         default:
@@ -317,6 +325,7 @@ void *worker(void *arg)
         pthread_mutex_unlock(&file_mutex[file_index]);
 
         printf("Worker Thread %d is processing Message ID: %d\n", thread_id, messageType);
+      
         pthread_cond_signal(&mq1_empty);
     }
 
@@ -347,6 +356,10 @@ void *frontend(void *arg)
 
             pthread_cond_signal(&mq1_full);
             pthread_mutex_unlock(&buffer_mutex);
+        }
+
+        if(should_exit) {
+            pthread_exit(NULL);
         }
     }
 
@@ -481,11 +494,12 @@ int main(int argc, char *argv[])
         printf("Error creating frontend thread");
         exit(EXIT_FAILURE);
     }
-
-    pthread_mutex_t quit_mutex = PTHREAD_MUTEX_INITIALIZER;
-    while(!should_exit) {
-        pthread_cond_wait(&quit_cond,&quit_mutex);
-    }
+    
+    printf("WAITING FOR QUIT SIGNAL");
+    pthread_mutex_lock(&quit_mutex);
+    pthread_cond_wait(&quit_cond,&quit_mutex);
+    printf("QUIT SIGNAL RECEVIED");
+    
 
     for (int i = 0; i < dcount; ++i)
     {
@@ -498,8 +512,6 @@ int main(int argc, char *argv[])
     mq_close(mq1);
     mq_close(mq2);
 
-    mq_unlink(mqname1);
-    mq_unlink(mqname2);
 
     printf("SERVER EXIT");
 

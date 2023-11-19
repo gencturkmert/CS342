@@ -273,7 +273,7 @@ if(dlevel == 1) {
 
             message.id = 0;
             if(dlevel == 1) {
-                printf("Message %s sent \n", input);
+                printf("Message %s sent \n", input); 
             }
 
             if (mq_send(mq1, (const char *)&message, sizeof(Message), 0) == -1)
