@@ -31,7 +31,7 @@ int buffer_size = 0;
 
 int deletion_marker = -1;
 bool should_exit = false;
-
+pthread_cond_t quit_cond = PTHREAD_COND_INITIALIZER;
 
 
 HashTable globalHashTables[MAX_FILES];
@@ -304,6 +304,7 @@ void *worker(void *arg)
             break;
         }
         case QUITSERVER: {
+            pthread_cond_signal(&quit_cond);
             should_exit = true;
             break;
         }
@@ -481,14 +482,9 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < tcount; ++i)
-    {
-        pthread_join(worker_threads[i], NULL);
-    }
-
-      for (int i = 0; i < tcount; ++i)
-    {
-        pthread_join(frontend_thread, NULL);
+    pthread_mutex_t quit_mutex = PTHREAD_MUTEX_INITIALIZER;
+    while(!should_exit) {
+        pthread_cond_wait(&quit_cond,&quit_mutex);
     }
 
     for (int i = 0; i < dcount; ++i)
@@ -496,9 +492,17 @@ int main(int argc, char *argv[])
         fclose(filePointers[i]);
     }
 
+    pthread_cond_destroy(&mq1_empty);
+    pthread_cond_destroy(&mq1_full);
+
     mq_close(mq1);
     mq_close(mq2);
-        printf("queues closed");
+
+    mq_unlink(mqname1);
+    mq_unlink(mqname2);
+
+    printf("SERVER EXIT");
+
 
     return 0;
 }

@@ -22,6 +22,7 @@ int dlevel;
 int clicount;
 ResponseQueue responseQueues[MAX_CLIENTS];
 bool quit = false;
+pthread_cond_t quit_cond = PTHREAD_COND_INITIALIZER;
 
 Message parseRequestString(const char *requestString)
 {
@@ -114,6 +115,7 @@ void *clientWorker(void *arg)
 
          if(requestMessage.messageType == QUIT) {
             quit = true;
+            pthread_cond_signal(&quit_cond);
             break;
         }
 
@@ -130,6 +132,7 @@ void *clientWorker(void *arg)
 
         if(requestMessage.messageType == QUITSERVER) {
             quit = true;
+            pthread_cond_signal(&quit_cond);
             pthread_exit(NULL);
         }
         pthread_mutex_lock(&response_mutex[thread_id]);
@@ -228,11 +231,13 @@ int main(int argc, char *argv[])
         }
     }
 
+if(dlevel == 1) {
     printf("clicount: %d\n", clicount);
     printf("fname: %s\n", fname);
     printf("vsize: %d\n", vsize);
     printf("mqname: %s\n", mqname);
     printf("dlevel: %d\n", dlevel);
+}
 
     char mqname1[256], mqname2[256];
 
@@ -249,69 +254,137 @@ int main(int argc, char *argv[])
     }else{
         printf("Q opened %s and %s\n",mqname1,mqname2);
     }
-    for (int i = 0; i < clicount; ++i)
-    {
-        char filename[256];
-        snprintf(filename, sizeof(filename), "%s%d%s", fname, i + 1, ".txt");
 
-        filePointers[i] = fopen(filename, "r");
-        if (filePointers[i] == NULL)
+
+    if(clicount == 0) {
+
+        while(!quit) {
+
+            char input[256];
+
+            printf("Enter a request: ");
+            
+            fgets(input, sizeof(input), stdin);
+
+            Message message = parseRequestString(input);
+
+            if(message.messageType == QUIT) {
+                quit = true;
+                pthread_cond_signal(&quit_cond);
+                break;
+            }
+
+            message.id = 0;
+            if(dlevel == 1) {
+                printf("Message %s sent \n", input);
+            }
+
+            if (mq_send(mq1, (const char *)&message, sizeof(Message), 0) == -1)
+            {
+                printf("Error sending request message to MQ1");
+                exit(EXIT_FAILURE);
+            }
+
+            if(message.messageType == QUITSERVER) {
+                quit = true;
+                pthread_cond_signal(&quit_cond);
+                break;
+            }
+
+
+            bool loop = false;
+            Message responseMessage;
+            while (!loop)
+            {
+                if (mq_receive(mq2, (char *)&responseMessage, sizeof(Message), NULL) > 0)
+                {
+                    loop = true;
+                }
+            }
+
+
+
+            if(dlevel ==1 ) {
+                if(responseMessage.success) {
+                    printf("Request %s returned succesfully \n",input);
+                }else{
+                    printf("Request %s failed\n",input);
+                }
+                if(responseMessage.messageType == GET_REQUEST) {
+                    printf("Value %s got from server for key %d\n",responseMessage.value,responseMessage.key);
+                }
+            }
+
+        }
+
+    }else{
+
+        for (int i = 0; i < clicount; ++i)
         {
-            fprintf(stderr, "Failed to open file: %s\n", filename);
+            char filename[256];
+            snprintf(filename, sizeof(filename), "%s%d%s", fname, i + 1, ".txt");
+
+            filePointers[i] = fopen(filename, "r");
+            if (filePointers[i] == NULL)
+            {
+                fprintf(stderr, "Failed to open file: %s\n", filename);
+                exit(EXIT_FAILURE);
+            }
+
+
+        }
+       
+
+        for (int i = 0; i < clicount; ++i)
+        {
+            pthread_mutex_init(&response_mutex[i], NULL);
+            pthread_cond_init(&response_cond[i], NULL);
+        }
+
+        for (int i = 0; i < clicount; ++i)
+        {
+            initQueue(&responseQueues[i]);
+        }
+
+    
+
+        int thread_ids[clicount];
+        pthread_t clientThreads[MAX_CLIENTS];
+        for (int i = 0; i < clicount; ++i)
+        {
+            thread_ids[i] = i;
+            if (pthread_create(&clientThreads[i], NULL, clientWorker, (void *)&thread_ids[i]) != 0)
+            {
+                perror("Error creating client thread");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        pthread_t frontendThread;
+        if (pthread_create(&frontendThread, NULL, frontend, NULL) != 0)
+        {
+            perror("Error creating frontend thread");
             exit(EXIT_FAILURE);
         }
 
-
-    }
-
-    for (int i = 0; i < clicount; ++i)
-    {
-        pthread_mutex_init(&response_mutex[i], NULL);
-        pthread_cond_init(&response_cond[i], NULL);
-    }
-
-    for (int i = 0; i < clicount; ++i)
-    {
-        initQueue(&responseQueues[i]);
-    }
-
- 
-
-    int thread_ids[clicount];
-    pthread_t clientThreads[MAX_CLIENTS];
-    for (int i = 0; i < clicount; ++i)
-    {
-        thread_ids[i] = i;
-        if (pthread_create(&clientThreads[i], NULL, clientWorker, (void *)&thread_ids[i]) != 0)
-        {
-            perror("Error creating client thread");
-            exit(EXIT_FAILURE);
+        pthread_mutex_t quit_mutex = PTHREAD_MUTEX_INITIALIZER;
+        while(!quit) {
+            pthread_cond_wait(&quit_cond,&quit_mutex);
         }
-    }
 
-       pthread_t frontendThread;
-    if (pthread_create(&frontendThread, NULL, frontend, NULL) != 0)
-    {
-        perror("Error creating frontend thread");
-        exit(EXIT_FAILURE);
-    }
+           // Destroy condition variables
+        for (int i = 0; i < clicount; ++i)
+        {
+            pthread_cond_destroy(&response_cond[i]);
+        }
+    }   
 
-    pthread_join(frontendThread, NULL);
-
-    for (int i = 0; i < clicount; ++i)
-    {
-        pthread_join(clientThreads[i], NULL);
-    }
-
+    pthread_cond_destroy(&quit_cond);
     mq_close(mq1);
     mq_close(mq2);
-    printf("queues closed");
+    printf("CLIENT EXIT");
 
-    // Destroy condition variables
-    for (int i = 0; i < clicount; ++i)
-    {
-        pthread_cond_destroy(&response_cond[i]);
-    }
+ 
 
     return 0;
 }
