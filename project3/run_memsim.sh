@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Example parameters
-LEVEL=1
+LEVEL=2
 ADDRFILE="addr.txt"
 SWAPFILE="swapfile.bin"
 FCOUNT=64

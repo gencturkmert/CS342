@@ -379,12 +379,12 @@ int main(int argc, char *argv[])
                 if ((entry & V_MASK) == 0x8000)
                 {
                     unsigned int ram_i = entry & ((int)pow(2, k_lsb) - 1);
-                    fseek(disc, i * PAGE_SIZE, SEEK_SET);
+                    fseek(disc, (i*SECOND_LEVEL_TABLE_SIZE + j )* PAGE_SIZE, SEEK_SET);
                    
                    for(int k = 0; k<PAGE_SIZE;k++) {
-                    unsigned char c = ram.data[ram_i].chars[k];
-                    //printf("wroting to file 0x%hhx\n",c);
-                    fwrite(&c,sizeof(char),1, disc);
+                        unsigned char c = ram.data[ram_i].chars[k];
+                        //printf("wroting to file 0x%hhx\n",c);
+                        fwrite(&c,sizeof(char),1, disc);
 
                     }
                 }
