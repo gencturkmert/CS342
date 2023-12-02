@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
     FILE *disc;
     if (access(swapfile, F_OK) == -1)
     {
-        disc = fopen(swapfile, "a+b"); // Open in binary write mode
+        disc = fopen(swapfile, "a+b");
 
         if (disc == NULL)
         {
@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
-        // Initialize to all zeros
+        // all zeros
         char zeroBuffer[PAGE_SIZE] = {0};
 
         for (int i = 0; i < VIRTUAL_MEMORY_SIZE; ++i)
@@ -204,7 +204,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    int k_lsb = (int)log2(fcount);
+    int k_lsb = (int)log2(fcount); // least significant k bits, to point frame no
 
     char line[256];
     char mode;
@@ -272,7 +272,7 @@ int main(int argc, char *argv[])
                 }
             }
 
-            // There is empty space
+            //  empty space exists
             if (ramIndex > -1)
             {
                 for (int j = 0; j < PAGE_SIZE; ++j)
@@ -326,17 +326,33 @@ int main(int argc, char *argv[])
             }
         }
 
+        // to do reminder: kısalt
         if (pf == 1)
         {
-            fprintf(output, "0x%x 0x%x %s 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "pagefault");
+            if (level == 1)
+            {
+
+                fprintf(output, "0x%x 0x%x %s 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "pagefault");
+            }
+            else
+            {
+                fprintf(output, "0x%x 0x%x 0x%x 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex1, pageIndex, offset, ram_i, pa, "pagefault");
+            }
         }
         else
         {
-            fprintf(output, "0x%x 0x%x %s 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "");
+            if (level == 1)
+            {
+                fprintf(output, "0x%x 0x%x %s 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "");
+            }
+            else
+            {
+                fprintf(output, "0x%x 0x%x 0x%x 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex1, pageIndex, offset, ram_i, pa, "");
+            }
         }
     }
 
-    free(ram.data);
+        free(ram.data);
     ram.data = 0;
     ram.data = NULL;
     fclose(input);
