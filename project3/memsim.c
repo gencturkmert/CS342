@@ -168,25 +168,24 @@ int main(int argc, char *argv[])
     char line[256];
     char mode;
     unsigned int virtualAddress;
-    int value; // optional, w mode onşy
+    unsigned int value; // optional, w mode onşy
 
     while (fgets(line, sizeof(line), input) != NULL)
     {
 
-        if (sscanf(line, " %c %x", &mode, &virtualAddress) == 2)
+        if (sscanf(line, " %c %x %x", &mode, virtualAddress, &value) == 3 && mode == 'w')
         {
-            printf("Read operation (mode: %c, virtual address: 0x%x)\n", mode, virtualAddress);
             unsigned int pageIndex = virtualAddress >> 6;
+            printf("Wrşte operation (mode: %c, virtual address: 0x%x, page index: %d, value 0x%x )\n", mode, virtualAddress, pageIndex, value);
+        }
+        else if (sscanf(line, " %c %x", &mode, &virtualAddress) == 2 && mode == 'r')
+        {
+            unsigned int pageIndex = virtualAddress >> 6;
+            printf("Read operation (mode: %c, virtual address: 0x%x, page index: %d)\n", mode, virtualAddress, pageIndex);
         }
         else
         {
             printf("Invalid line: %s", line);
-            return 1;
-        }
-
-        if (mode == 'w' && sscanf(line, " %*c %*x %x", &value) == 1)
-        {
-            printf("Write operation (mode: %c, virtual address: 0x%x, value: 0x%x)\n", mode, virtualAddress, value);
         }
     }
 
