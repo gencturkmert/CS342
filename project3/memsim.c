@@ -10,17 +10,9 @@
 #define SECOND_LEVEL_SIZE 5
 #define SECOND_LEVEL_TABLE_SIZE 32
 
-int level;
-char addrfile[100];
-char swapfile[100];
-int fcount;
-char algo[10];
-int tick;
-char outfile[100];
-
-char *ram;
-
-int totalPageFault = 0;
+#define V_INDEX 0
+#define R_INDEX 1
+#define M_INDEX 2
 
 // V+R+M+ UNUSED BITS + K BITS
 // V = 0 is invalid
@@ -33,6 +25,28 @@ struct FirstLevelPageTable
 {
     struct PageTableEntry entries[VIRTUAL_MEMORY_SIZE];
 };
+typedef struct
+{
+    char chars[PAGE_SIZE];
+} Data;
+
+typedef struct
+{
+    size_t size;
+    Data *data;
+} RAM;
+
+int level;
+char addrfile[100];
+char swapfile[100];
+int fcount;
+char algo[10];
+int tick;
+char outfile[100];
+
+RAM ram;
+
+int totalPageFault = 0;
 
 int main(int argc, char *argv[])
 {
@@ -135,18 +149,21 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // allocate memory for simulated ram
-    ram = (char *)malloc(fcount * PAGE_SIZE);
-    if (ram == NULL)
+    ram.size = fcount;
+    ram.data = (Data *)malloc(fcount * sizeof(Data));
+    if (ram.data == NULL)
     {
-        printf("Error allocating memory for RAM");
+        fprintf(stderr, "Memory allocation for RAM data failed.\n");
         fclose(input);
         fclose(disc);
         fclose(output);
         return 1;
     }
 
-    memset(ram, 0, fcount * PAGE_SIZE);
+    for (size_t i = 0; i < fcount; ++i)
+    {
+        memset(ram.data[i].chars, '\0', PAGE_SIZE);
+    }
 
     struct FirstLevelPageTable pageTable;
     if (level == 1)
@@ -163,11 +180,13 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    //int k_lsb = log2(fcount);
+    int k_lsb = (int)log2(fcount);
 
     char line[256];
     char mode;
     unsigned int virtualAddress;
+    unsigned int pageIndex;
+    unsigned int pageIndex2 = 0;
     unsigned int value; // optional, w mode onşy
 
     while (fgets(line, sizeof(line), input) != NULL)
@@ -175,21 +194,70 @@ int main(int argc, char *argv[])
 
         if (sscanf(line, " %c %x %x", &mode, &virtualAddress, &value) == 3 && mode == 'w')
         {
-            unsigned int pageIndex = virtualAddress >> 6;
+            pageIndex = virtualAddress >> 6;
             printf("Wrşte operation (mode: %c, virtual address: 0x%x, page index: %d, value 0x%x )\n", mode, virtualAddress, pageIndex, value);
         }
         else if (sscanf(line, " %c %x", &mode, &virtualAddress) == 2 && mode == 'r')
         {
-            unsigned int pageIndex = virtualAddress >> 6;
+            pageIndex = virtualAddress >> 6;
             printf("Read operation (mode: %c, virtual address: 0x%x, page index: %d)\n", mode, virtualAddress, pageIndex);
         }
         else
         {
             printf("Invalid line: %s", line);
         }
+
+        // page table access
+        if (level == 1)
+        {
+            // INVALID
+            if (pageTable.entries[pageIndex].[V_INDEX] == 0)
+            {
+                totalPageFault = totalPageFault + 1;
+                printf("Page fault for page %d\n", pageIndex);
+
+                char buffer[64];
+
+                fseek(disc, pageIndex * PAGE_SIZE, SEEK_SET);
+
+                fread(buffer, PAGE_SIZE, 1, disc);
+
+                int ramIndex = -1;
+                for (size_t i = 0; i < ram->size; ++i)
+                {
+                    if (memcmp(ram.data[i].chars, "\0", PAGE_SIZE) == 0)
+                    {
+                        ramIndex = i;
+                        break;
+                    }
+                }
+
+                // There is empty space
+                if (ramIndex > 0)
+                {
+                    for (int j = 0; j < PAGE_SIZE; ++j)
+                    {
+                        ram.data[ramIndex].chars[j] = buffer[j];
+                    }
+
+                    pageTable.entries[pageIndex].[V_INDEX] == 1;
+                }
+                else
+                {
+                    // THERE IS NO EMPTY SPACE, USE ALGO
+                }
+            }
+
+            unsigned int offsetValue = ram.data[pageIndex].chars[virtualAddress & 0x3F];
+        }
+        else
+        {
+        }
     }
 
-    free(ram);
+    free(ram->data);
+    ram->size = 0;
+    ram->data = NULL;
     fclose(input);
     fclose(disc);
     fclose(output);
