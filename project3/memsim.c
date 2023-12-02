@@ -20,7 +20,10 @@ char outfile[100];
 
 char *ram;
 
-// R+M+V + UNUSED BITS + K BITS
+int totalPageFault = 0;
+
+// V+R+M+ UNUSED BITS + K BITS
+// V = 0 is invalid
 struct PageTableEntry
 {
     char bits[16];
@@ -157,9 +160,35 @@ int main(int argc, char *argv[])
     if (level == 2)
     {
         printf("SECOND LEVEL NOT IMPLEMENTED");
+        return 1;
     }
 
     int k_lsb = log2(fcount);
+
+    char line[256];
+    char mode;
+    unsigned int virtualAddress;
+    int value; // optional, w mode onşy
+
+    while (fgets(line, sizeof(line), input) != NULL)
+    {
+
+        if (sscanf(line, " %c %x", &mode, &virtualAddress) == 2)
+        {
+            printf("Read operation (mode: %c, virtual address: 0x%x)\n", mode, virtualAddress);
+            unsigned int pageIndex = virtualAddress >> 6;
+        }
+        else
+        {
+            printf("Invalid line: %s", line);
+            return 1;
+        }
+
+        if (mode == 'w' && sscanf(line, " %*c %*x %x", &value) == 1)
+        {
+            printf("Write operation (mode: %c, virtual address: 0x%x, value: 0x%x)\n", mode, virtualAddress, value);
+        }
+    }
 
     free(ram);
     fclose(input);
