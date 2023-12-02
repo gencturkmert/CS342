@@ -10,15 +10,15 @@
 #define SECOND_LEVEL_SIZE 5
 #define SECOND_LEVEL_TABLE_SIZE 32
 
-#define V_INDEX 0
-#define R_INDEX 1
-#define M_INDEX 2
+#define V_MASK 0x80
+#define R_MASK 0x40
+#define M_MASK 0x20
 
 // V+R+M+ UNUSED BITS + K BITS
 // V = 0 is invalid
 struct PageTableEntry
 {
-    char bits[16];
+    unsigned short int = 0x00;
 };
 
 struct FirstLevelPageTable
@@ -168,10 +168,10 @@ int main(int argc, char *argv[])
     struct FirstLevelPageTable pageTable;
     if (level == 1)
     {
-        for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
-        {
-            memset(pageTable.entries[i].bits, '0', sizeof(pageTable.entries[i].bits));
-        }
+        // for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
+        // {
+        //     memset(pageTable.entries[i].bits, '0', sizeof(pageTable.entries[i].bits));
+        // }
     }
 
     if (level == 2)
@@ -210,9 +210,11 @@ int main(int argc, char *argv[])
         // page table access
         if (level == 1)
         {
+            bool pf = false;
             // INVALID
-            if (pageTable.entries[pageIndex].[V_INDEX] == 0)
+            if (pageTable.entries[pageIndex].bits & V_MASK == 0)
             {
+                pf = true;
                 totalPageFault = totalPageFault + 1;
                 printf("Page fault for page %d\n", pageIndex);
 
@@ -240,18 +242,38 @@ int main(int argc, char *argv[])
                         ram.data[ramIndex].chars[j] = buffer[j];
                     }
 
-                    pageTable.entries[pageIndex].[V_INDEX] == 1;
+                    pageTable.entries[pageIndex].bits == pageTable.entries[pageIndex].bits & 0x8000;
+
+                    for (int i = k_lsb - 1; i >= 0; i--)
+                    {
+                        pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits + k_lsb;
+                    }
                 }
                 else
                 {
                     // THERE IS NO EMPTY SPACE, USE ALGO
+                    printf("ALGORITHM NOT IMPLEMENTED YET");
                 }
             }
 
-            unsigned int offsetValue = ram.data[pageIndex].chars[virtualAddress & 0x3F];
+            unsigned int ram_i = pageTable.entries[pageIndex].bits & ((int)pow(2, k_lsb) - 1);
+            unsigned int offset = virtualAddress & 0x3F;
+            unsigned int offsetValue = ram.data[ram_i].chars[offset];
+            unsigned int pa = ram_i * PAGE_SIZE + offset;
+
+            if (pf)
+            {
+                fprintf(output, "%x %x %s %x %x %x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "");
+            }
+            else
+            {
+                fprintf(output, "%x %x %s %x %x %x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "pagefault");
+            }
         }
         else
         {
+            printf("SECOND LEVEL NOT IMPLEMENTED");
+            return 1;
         }
     }
 
