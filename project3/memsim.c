@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
         else
         {
             printf("Error: Unknown option %s\n", argv[i]);
-            printUsage();
+            printf("Usage: memsim -p level -r addrfile -s swapfile -f fcount -a algo -t tick -o outfile\n");
             return 1;
         }
     }
@@ -148,12 +148,12 @@ int main(int argc, char *argv[])
 
     memset(ram, 0, fcount * PAGE_SIZE);
 
-    struct FirstLevelPageTable *pageTable;
+    struct FirstLevelPageTable pageTable;
     if (level == 1)
     {
         for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
         {
-            memset(firstLevelPageTable.entries[i].bits, '0', sizeof(firstLevelPageTable.entries[i].bits));
+            memset(pageTable.entries[i].bits, '0', sizeof(pageTable.entries[i].bits));
         }
     }
 
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    int k_lsb = log2(fcount);
+    //int k_lsb = log2(fcount);
 
     char line[256];
     char mode;
@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
     while (fgets(line, sizeof(line), input) != NULL)
     {
 
-        if (sscanf(line, " %c %x %x", &mode, virtualAddress, &value) == 3 && mode == 'w')
+        if (sscanf(line, " %c %x %x", &mode, &virtualAddress, &value) == 3 && mode == 'w')
         {
             unsigned int pageIndex = virtualAddress >> 6;
             printf("Wrşte operation (mode: %c, virtual address: 0x%x, page index: %d, value 0x%x )\n", mode, virtualAddress, pageIndex, value);
