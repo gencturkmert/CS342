@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
 
                 int ramIndex = -1;
                
-                for (int i = 17; i < fcount; ++i)
+                for (int i = 0; i < fcount; ++i)
                 {
                     if (hasNonNullOrNot(ram.data[i].chars) == 0)
                     {
@@ -275,11 +275,11 @@ int main(int argc, char *argv[])
 
             if (pf ==1)
             {
-                fprintf(output, "%x %x %s %x %x %x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "pagefault");
+                fprintf(output, "0x%x 0x%x %s 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "pagefault");
             }
             else
             {
-                fprintf(output, "%x %x %s %x %x %x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "");
+                fprintf(output, "0x%x 0x%x %s 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "");
             }
         }
         else
