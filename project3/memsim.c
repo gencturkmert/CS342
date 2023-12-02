@@ -352,7 +352,45 @@ int main(int argc, char *argv[])
         }
     }
 
-        free(ram.data);
+    fprintf(output, "Page Fault No: %d", totalPageFault);
+
+    if (level == 1)
+    {
+
+        for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
+        {
+
+            unsigned int entry = firstLevelPageTable.entries[i].bits;
+
+            // if entry valid and in ram
+            if ((entry & V_MASK) == 0x8000)
+            {
+                unsigned int ram_i = entry & ((int)pow(2, k_lsb) - 1);
+                char page[PAGE_SIZE] = ram.data[ram_i].chars;
+                fseek(disc, i * PAGE_SIZE, SEEK_SET);
+                fwrite(page, sizeof(page), 1, disc);
+            }
+        }
+    }
+    else
+    {
+        for (int i = 0; i < SECOND_LEVEL_TABLE_SIZE; i++)
+        {
+            for (int j = 0; j < SECOND_LEVEL_TABLE_SIZE; j++)
+            {
+                unsigned int entry = secondLevelPageTable.tables[i].entries[j];
+                if ((entry & V_MASK) == 0x8000)
+                {
+                    unsigned int ram_i = entry & ((int)pow(2, k_lsb) - 1);
+                    char page[PAGE_SIZE] = ram.data[ram_i].chars;
+                    fseek(disc, i * PAGE_SIZE, SEEK_SET);
+                    fwrite(page, sizeof(page), 1, disc);
+                }
+            }
+        }
+    }
+
+    free(ram.data);
     ram.data = 0;
     ram.data = NULL;
     fclose(input);
