@@ -7,7 +7,6 @@
 #define PAGE_SIZE 64
 #define VIRTUAL_MEMORY_SIZE 1024
 
-#define SECOND_LEVEL_SIZE 5
 #define SECOND_LEVEL_TABLE_SIZE 32
 
 #define V_MASK 0x8000
@@ -29,6 +28,11 @@ typedef struct
 {
     char chars[PAGE_SIZE];
 } Data;
+
+struct SecondLevelPageTable
+{
+    struct FirstLevelPageTable tables[SECOND_LEVEL_TABLE_SIZE];
+}
 
 typedef struct
 {
@@ -54,10 +58,10 @@ int hasNonNullOrNot(const char *str)
     {
         if (str[i] != '0')
         {
-            return 1; 
+            return 1;
         }
     }
-    return 0; 
+    return 0;
 }
 
 int main(int argc, char *argv[])
@@ -177,18 +181,27 @@ int main(int argc, char *argv[])
         memset(ram.data[i].chars, '0', PAGE_SIZE);
     }
 
-    struct FirstLevelPageTable pageTable;
+    struct FirstLevelPageTable firstLevelPageTable;
     if (level == 1)
     {
-        for(int i = 0; i<VIRTUAL_MEMORY_SIZE; i++) {
-            pageTable.entries[i].bits = 0x0000;
+        for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
+        {
+            firstLevelPageTable.entries[i].bits = 0x0000;
         }
     }
 
+    struct SecondLevelPageTable secondLevelPageTable;
     if (level == 2)
     {
-        printf("SECOND LEVEL NOT IMPLEMENTED");
-        return 1;
+        for (int j = 0; j < SECOND_LEVEL_TABLE_SIZE; j++)
+        {
+            struct FirstLevelPageTable childPageTable;
+            for (int i = 0; i < SECOND_LEVEL_TABLE_SIZE; i++)
+            {
+                childPageTable.entries[i].bits = 0x0000;
+            }
+            secondLevelPageTable.tables[i] = childPageTable;
+        }
     }
 
     int k_lsb = (int)log2(fcount);
@@ -197,8 +210,7 @@ int main(int argc, char *argv[])
     char mode;
     unsigned int virtualAddress;
     unsigned int pageIndex;
-    unsigned int pageIndex2 = 0;
-    unsigned int value; // optional, w mode onşy
+    char value; // optional, w mode onşy
 
     while (fgets(line, sizeof(line), input) != NULL)
     {
@@ -206,86 +218,121 @@ int main(int argc, char *argv[])
         if (sscanf(line, " %c %x %x", &mode, &virtualAddress, &value) == 3 && mode == 'w')
         {
             pageIndex = virtualAddress >> 6;
-            printf("Wrşte operation (mode: %c, virtual address: 0x%x, page index: %d, value 0x%x )\n", mode, virtualAddress, pageIndex, value);
+            printf("Wrşte operation (mode: %c, virtual address: 0x%hhx, page index: %d, value 0x%hhx )\n", mode, virtualAddress, pageIndex, value);
         }
         else if (sscanf(line, " %c %x", &mode, &virtualAddress) == 2 && mode == 'r')
         {
             pageIndex = virtualAddress >> 6;
-            printf("Read operation (mode: %c, virtual address: 0x%x, page index: %d)\n", mode, virtualAddress, pageIndex);
+            printf("Read operation (mode: %c, virtual address: 0x%hhx, page index: %d)\n", mode, virtualAddress, pageIndex);
         }
         else
         {
             printf("Invalid line: %s", line);
         }
 
+        struct FirstLevelPageTable pageTable;
+        int pageIndex1 = 0;
         // page table access
         if (level == 1)
         {
-            int pf = 0;
-            // INVALID
-            if (((int)pageTable.entries[pageIndex].bits & V_MASK ) >> 15 == 0)
+            pageTable = firstLevelPageTable;
+        }
+        else
+        {
+            int pageIndex2 = pageIndex & 0x1f; // last 5 bits
+            pageIndex1 = pageIndex >> 5;       // first 5 bits
+
+            pageTable = secondLevelPageTable.tables[pageIndex1];
+            pageIndex = pageIndex2;
+        }
+
+        int pf = 0;
+        // INVALID
+        if (((int)pageTable.entries[pageIndex].bits & V_MASK) >> 15 == 0)
+        {
+            pf = 1;
+            totalPageFault = totalPageFault + 1;
+            printf("Page fault for page %d\n", pageIndex);
+
+            char buffer[64];
+
+            fseek(disc, pageIndex * PAGE_SIZE, SEEK_SET);
+
+            fread(buffer, PAGE_SIZE, 1, disc);
+
+            int ramIndex = -1;
+
+            for (int i = 0; i < fcount; ++i)
             {
-                pf = 1;
-                totalPageFault = totalPageFault + 1;
-                printf("Page fault for page %d\n", pageIndex);
-
-                char buffer[64];
-
-                fseek(disc, pageIndex * PAGE_SIZE, SEEK_SET);
-
-                fread(buffer, PAGE_SIZE, 1, disc);
-
-                int ramIndex = -1;
-               
-                for (int i = 0; i < fcount; ++i)
+                if (hasNonNullOrNot(ram.data[i].chars) == 0)
                 {
-                    if (hasNonNullOrNot(ram.data[i].chars) == 0)
-                    {
-                        printf("Empty space at ram index : %d \n", i);
-                        ramIndex = i;
-                        break;
-                    }
-                }
-
-                // There is empty space
-                if (ramIndex > -1)
-                {
-                    for (int j = 0; j < PAGE_SIZE; ++j)
-                    {
-                        ram.data[ramIndex].chars[j] = buffer[j];
-                    }
-
-                    pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits | 0x8000;
-                    printf("Entry validated: %x\n", pageTable.entries[pageIndex].bits);
-
-                    pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits + ramIndex;
-                    printf("Entry value now: %x\n", pageTable.entries[pageIndex].bits);
-                }
-                else
-                {
-                    // THERE IS NO EMPTY SPACE, USE ALGO
-                    printf("EMPTY SPACE NOT IMPLEMENTED YET\n");
+                    printf("Empty space at ram index : %d \n", i);
+                    ramIndex = i;
+                    break;
                 }
             }
 
-            unsigned int ram_i = pageTable.entries[pageIndex].bits & ((int)pow(2, k_lsb) - 1);
-            unsigned int offset = virtualAddress & 0x3F;
-            unsigned int offsetValue = ram.data[ram_i].chars[offset];
-            unsigned int pa = ram_i * PAGE_SIZE + offset;
-
-            if (pf ==1)
+            // There is empty space
+            if (ramIndex > -1)
             {
-                fprintf(output, "0x%x 0x%x %s 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "pagefault");
+                for (int j = 0; j < PAGE_SIZE; ++j)
+                {
+                    ram.data[ramIndex].chars[j] = buffer[j];
+                }
+
+                pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits | V_MASK;
+                pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits | R_MASK;
+                printf("Entry %d validated & referenced: 0x%x\n", pageIndex, pageTable.entries[pageIndex].bits);
+
+                pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits + ramIndex;
+                printf("Entry value now: 0x%x\n", pageTable.entries[pageIndex].bits);
             }
             else
             {
-                fprintf(output, "0x%x 0x%x %s 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "");
+                // THERE IS NO EMPTY SPACE, USE ALGO
+                printf("EMPTY SPACE NOT IMPLEMENTED YET\n");
+            }
+        }
+
+        unsigned int ram_i = pageTable.entries[pageIndex].bits & ((int)pow(2, k_lsb) - 1);
+        unsigned int offset = virtualAddress & 0x3F;
+        unsigned int offsetValue = ram.data[ram_i].chars[offset];
+        unsigned int pa = ram_i * PAGE_SIZE + offset;
+        if (mode == 'r')
+        {
+            if (level == 1)
+            {
+                printf("Value 0x%x is read from page %d from frame %d \n", offsetValue, pageIndex, ram_i);
+            }
+            else
+            {
+                printf("Value 0x%x is read from (page %d - page %d) from frame %d \n", offsetValue, pageIndex1, pageIndex, ram_i);
             }
         }
         else
         {
-            printf("SECOND LEVEL NOT IMPLEMENTED");
-            return 1;
+            // write value
+            ram.data[ram_i].charts[offset] = value;
+            pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits | M_MASK;
+            printf("Entry %d modified: 0x%x\n", pageIndex, pageTable.entries[pageIndex].bits);
+
+            if (level == 1)
+            {
+                printf("(Old value 0x%x) New value 0x%x is written to page %d to frame %d \n", offsetValue, value, pageIndex, ram_i);
+            }
+            else
+            {
+                printf("(Old value 0x%x) New value 0x%x is written to (page %d - page %d) to frame %d \n", offsetValue, value, pageIndex1, pageIndex, ram_i);
+            }
+        }
+
+        if (pf == 1)
+        {
+            fprintf(output, "0x%x 0x%x %s 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "pagefault");
+        }
+        else
+        {
+            fprintf(output, "0x%x 0x%x %s 0x%x 0x%x 0x%x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "");
         }
     }
 
