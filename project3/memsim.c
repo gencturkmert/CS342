@@ -229,6 +229,7 @@ int main(int argc, char *argv[])
                 {
                     if (memcmp(ram.data[i].chars, "\0", PAGE_SIZE) == 0)
                     {
+                        printf("Empty space at ram index : %d \n", i);
                         ramIndex = i;
                         break;
                     }
@@ -242,12 +243,11 @@ int main(int argc, char *argv[])
                         ram.data[ramIndex].chars[j] = buffer[j];
                     }
 
-                    pageTable.entries[pageIndex].bits == pageTable.entries[pageIndex].bits & 0x8000;
+                    pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits & 0x8000;
+                    printf("Entry validated: %x\n", pageTable.entries[pageIndex].bits);
 
-                    for (int i = k_lsb - 1; i >= 0; i--)
-                    {
-                        pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits + k_lsb;
-                    }
+                    pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits + k_lsb;
+                    printf("Entry value now: %x\n", pageTable.entries[pageIndex].bits);
                 }
                 else
                 {
