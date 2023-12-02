@@ -2,9 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
 
 #define PAGE_SIZE 64
 #define VIRTUAL_MEMORY_SIZE 1024
+
+#define SECOND_LEVEL_SIZE 5
+#define SECOND_LEVEL_TABLE_SIZE 32
 
 int level;
 char addrfile[100];
@@ -16,17 +20,23 @@ char outfile[100];
 
 char *ram;
 
-void printUsage()
+// R+M+V + UNUSED BITS + K BITS
+struct PageTableEntry
 {
-    printf("Usage: memsim -p level -r addrfile -s swapfile -f fcount -a algo -t tick -o outfile\n");
-}
+    char bits[16];
+};
+
+struct FirstLevelPageTable
+{
+    struct PageTableEntry entries[VIRTUAL_MEMORY_SIZE];
+};
 
 int main(int argc, char *argv[])
 {
     if (argc != 15)
     {
         printf("Error: Incorrect number of arguments\n");
-        printUsage();
+        printf("Usage: memsim -p level -r addrfile -s swapfile -f fcount -a algo -t tick -o outfile\n");
         return 1;
     }
 
@@ -90,7 +100,7 @@ int main(int argc, char *argv[])
 
         if (disc == NULL)
         {
-            perror("Error creating swapfile");
+            printf("Error creating swapfile");
             exit(1);
         }
 
@@ -99,7 +109,7 @@ int main(int argc, char *argv[])
 
         for (int i = 0; i < VIRTUAL_MEMORY_SIZE; ++i)
         {
-            fwrite(zeroBuffer, sizeof(char), PAGE_SIZE, swapFile);
+            fwrite(zeroBuffer, sizeof(char), PAGE_SIZE, disc);
         }
     }
     else
@@ -108,7 +118,7 @@ int main(int argc, char *argv[])
         if (disc == NULL)
         {
             printf("Error opening swapfile");
-            fclose(addrFile);
+            fclose(input);
             return 1;
         }
     }
@@ -117,8 +127,8 @@ int main(int argc, char *argv[])
     if (output == NULL)
     {
         printf("Error opening outfile");
-        fclose(addrFile);
-        fclose(swapFile);
+        fclose(input);
+        fclose(disc);
         return 1;
     }
 
@@ -127,11 +137,34 @@ int main(int argc, char *argv[])
     if (ram == NULL)
     {
         printf("Error allocating memory for RAM");
-        fclose(addrFile);
-        fclose(swapFile);
-        fclose(outFile);
+        fclose(input);
+        fclose(disc);
+        fclose(output);
         return 1;
     }
+
+    memset(ram, 0, fcount * PAGE_SIZE);
+
+    struct FirstLevelPageTable *pageTable;
+    if (level == 1)
+    {
+        for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
+        {
+            memset(firstLevelPageTable.entries[i].bits, '0', sizeof(firstLevelPageTable.entries[i].bits));
+        }
+    }
+
+    if (level == 2)
+    {
+        printf("SECOND LEVEL NOT IMPLEMENTED");
+    }
+
+    int k_lsb = log2(fcount);
+
+    free(ram);
+    fclose(input);
+    fclose(disc);
+    fclose(output);
 
     return 0;
 }
