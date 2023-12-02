@@ -32,7 +32,7 @@ typedef struct
 struct SecondLevelPageTable
 {
     struct FirstLevelPageTable tables[SECOND_LEVEL_TABLE_SIZE];
-}
+};
 
 typedef struct
 {
@@ -127,34 +127,24 @@ int main(int argc, char *argv[])
     }
 
     FILE *disc;
-    if (access(swapfile, F_OK) == -1)
+ 
+    disc = fopen(swapfile, "w+b");
+
+    if (disc == NULL)
     {
-        disc = fopen(swapfile, "a+b");
-
-        if (disc == NULL)
-        {
-            printf("Error creating swapfile");
-            exit(1);
-        }
-
-        // all zeros
-        char zeroBuffer[PAGE_SIZE] = {0};
-
-        for (int i = 0; i < VIRTUAL_MEMORY_SIZE; ++i)
-        {
-            fwrite(zeroBuffer, sizeof(char), PAGE_SIZE, disc);
-        }
+        printf("Error creating swapfile");
+        exit(1);
     }
-    else
+
+    // all zeros
+    unsigned char zeroBuffer = 0;
+
+    for (int i = 0; i < VIRTUAL_MEMORY_SIZE * PAGE_SIZE; ++i)
     {
-        disc = fopen(swapfile, "a+b"); // a+ for read and write, b for binary
-        if (disc == NULL)
-        {
-            printf("Error opening swapfile");
-            fclose(input);
-            return 1;
-        }
+        fwrite(&zeroBuffer, sizeof(char), 1, disc);
     }
+    
+
 
     FILE *output = fopen(outfile, "w");
     if (output == NULL)
@@ -200,7 +190,7 @@ int main(int argc, char *argv[])
             {
                 childPageTable.entries[i].bits = 0x0000;
             }
-            secondLevelPageTable.tables[i] = childPageTable;
+            secondLevelPageTable.tables[j] = childPageTable;
         }
     }
 
@@ -215,7 +205,7 @@ int main(int argc, char *argv[])
     while (fgets(line, sizeof(line), input) != NULL)
     {
 
-        if (sscanf(line, " %c %x %x", &mode, &virtualAddress, &value) == 3 && mode == 'w')
+        if (sscanf(line, " %c %x 0x%hhx", &mode, &virtualAddress, &value) == 3 && mode == 'w')
         {
             pageIndex = virtualAddress >> 6;
             printf("Wrşte operation (mode: %c, virtual address: 0x%hhx, page index: %d, value 0x%hhx )\n", mode, virtualAddress, pageIndex, value);
@@ -230,25 +220,26 @@ int main(int argc, char *argv[])
             printf("Invalid line: %s", line);
         }
 
-        struct FirstLevelPageTable pageTable;
         int pageIndex1 = 0;
         // page table access
+        struct FirstLevelPageTable *pageTable;
         if (level == 1)
         {
-            pageTable = firstLevelPageTable;
+            pageTable = &firstLevelPageTable;
         }
         else
         {
             int pageIndex2 = pageIndex & 0x1f; // last 5 bits
             pageIndex1 = pageIndex >> 5;       // first 5 bits
 
-            pageTable = secondLevelPageTable.tables[pageIndex1];
+            pageTable = &(secondLevelPageTable.tables[pageIndex1]);
             pageIndex = pageIndex2;
         }
 
         int pf = 0;
         // INVALID
-        if (((int)pageTable.entries[pageIndex].bits & V_MASK) >> 15 == 0)
+        //printf("FIRST BIT OF ENTRY 0x%x: %d",pageTable->entries[pageIndex].bits,(pageTable->entries[pageIndex].bits >> 15));
+        if (((int)pageTable->entries[pageIndex].bits) >> 15 == 0)
         {
             pf = 1;
             totalPageFault = totalPageFault + 1;
@@ -280,12 +271,12 @@ int main(int argc, char *argv[])
                     ram.data[ramIndex].chars[j] = buffer[j];
                 }
 
-                pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits | V_MASK;
-                pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits | R_MASK;
-                printf("Entry %d validated & referenced: 0x%x\n", pageIndex, pageTable.entries[pageIndex].bits);
+                pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
+                pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
+               // printf("Entry %d validated & referenced: 0x%x\n", pageIndex, pageTable->entries[pageIndex].bits);
 
-                pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits + ramIndex;
-                printf("Entry value now: 0x%x\n", pageTable.entries[pageIndex].bits);
+                pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + ramIndex;
+                //printf("Entry value now: 0x%x\n", pageTable->entries[pageIndex].bits);
             }
             else
             {
@@ -294,35 +285,36 @@ int main(int argc, char *argv[])
             }
         }
 
-        unsigned int ram_i = pageTable.entries[pageIndex].bits & ((int)pow(2, k_lsb) - 1);
+        unsigned int ram_i = pageTable->entries[pageIndex].bits & ((int)pow(2, k_lsb) - 1);
         unsigned int offset = virtualAddress & 0x3F;
-        unsigned int offsetValue = ram.data[ram_i].chars[offset];
+        char offsetValue = ram.data[ram_i].chars[offset];
         unsigned int pa = ram_i * PAGE_SIZE + offset;
         if (mode == 'r')
         {
             if (level == 1)
             {
-                printf("Value 0x%x is read from page %d from frame %d \n", offsetValue, pageIndex, ram_i);
+                printf("Value 0x%hhx is read from page %d from frame %d \n", offsetValue, pageIndex, ram_i);
             }
             else
             {
-                printf("Value 0x%x is read from (page %d - page %d) from frame %d \n", offsetValue, pageIndex1, pageIndex, ram_i);
+                printf("Value 0x%hhx is read from (page %d - page %d) from frame %d \n", offsetValue, pageIndex1, pageIndex, ram_i);
             }
         }
         else
         {
             // write value
-            ram.data[ram_i].charts[offset] = value;
-            pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits | M_MASK;
-            printf("Entry %d modified: 0x%x\n", pageIndex, pageTable.entries[pageIndex].bits);
+            ram.data[ram_i].chars[offset] = value;
+            pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | M_MASK;
+            char newVal = ram.data[ram_i].chars[offset];
+            printf("Entry %d modified: 0x%x\n", pageIndex, pageTable->entries[pageIndex].bits);
 
             if (level == 1)
             {
-                printf("(Old value 0x%x) New value 0x%x is written to page %d to frame %d \n", offsetValue, value, pageIndex, ram_i);
+                printf("(Old value 0x%x) New value 0x%hhx is written to page %d to frame %d \n", offsetValue, newVal, pageIndex, ram_i);
             }
             else
             {
-                printf("(Old value 0x%x) New value 0x%x is written to (page %d - page %d) to frame %d \n", offsetValue, value, pageIndex1, pageIndex, ram_i);
+                printf("(Old value 0x%x) New value 0x%hhx is written to (page %d - page %d) to frame %d \n", offsetValue, newVal, pageIndex1, pageIndex, ram_i);
             }
         }
 
@@ -353,7 +345,6 @@ int main(int argc, char *argv[])
     }
 
     fprintf(output, "Page Fault No: %d", totalPageFault);
-
     if (level == 1)
     {
 
@@ -361,14 +352,20 @@ int main(int argc, char *argv[])
         {
 
             unsigned int entry = firstLevelPageTable.entries[i].bits;
+           // printf("entry: 0x%x, first bit: %d\n",entry,(firstLevelPageTable.entries[i].bits >> 15));
 
             // if entry valid and in ram
-            if ((entry & V_MASK) == 0x8000)
+            if (((int)firstLevelPageTable.entries[i].bits) >> 15 != 0)
             {
                 unsigned int ram_i = entry & ((int)pow(2, k_lsb) - 1);
-                char page[PAGE_SIZE] = ram.data[ram_i].chars;
                 fseek(disc, i * PAGE_SIZE, SEEK_SET);
-                fwrite(page, sizeof(page), 1, disc);
+
+                for(int k = 0; k<PAGE_SIZE;k++) {
+                    unsigned char c = ram.data[ram_i].chars[k];
+                    //printf("wroting to file 0x%hhx\n",c);
+                    fwrite(&c,sizeof(char),1, disc);
+
+                }
             }
         }
     }
@@ -378,13 +375,18 @@ int main(int argc, char *argv[])
         {
             for (int j = 0; j < SECOND_LEVEL_TABLE_SIZE; j++)
             {
-                unsigned int entry = secondLevelPageTable.tables[i].entries[j];
+                unsigned int entry = secondLevelPageTable.tables[i].entries[j].bits;
                 if ((entry & V_MASK) == 0x8000)
                 {
                     unsigned int ram_i = entry & ((int)pow(2, k_lsb) - 1);
-                    char page[PAGE_SIZE] = ram.data[ram_i].chars;
                     fseek(disc, i * PAGE_SIZE, SEEK_SET);
-                    fwrite(page, sizeof(page), 1, disc);
+                   
+                   for(int k = 0; k<PAGE_SIZE;k++) {
+                    unsigned char c = ram.data[ram_i].chars[k];
+                    //printf("wroting to file 0x%hhx\n",c);
+                    fwrite(&c,sizeof(char),1, disc);
+
+                    }
                 }
             }
         }
