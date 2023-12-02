@@ -10,15 +10,15 @@
 #define SECOND_LEVEL_SIZE 5
 #define SECOND_LEVEL_TABLE_SIZE 32
 
-#define V_MASK 0x80
-#define R_MASK 0x40
-#define M_MASK 0x20
+#define V_MASK 0x8000
+#define R_MASK 0x4000
+#define M_MASK 0x2000
 
 // V+R+M+ UNUSED BITS + K BITS
 // V = 0 is invalid
 struct PageTableEntry
 {
-    unsigned short int = 0x00;
+    unsigned short int bits;
 };
 
 struct FirstLevelPageTable
@@ -32,7 +32,7 @@ typedef struct
 
 typedef struct
 {
-    size_t size;
+    int size;
     Data *data;
 } RAM;
 
@@ -47,6 +47,18 @@ char outfile[100];
 RAM ram;
 
 int totalPageFault = 0;
+
+int hasNonNullOrNot(const char *str)
+{
+    for (int i = 0; i < PAGE_SIZE; ++i)
+    {
+        if (str[i] != '\0')
+        {
+            return 1; 
+        }
+    }
+    return 0; 
+}
 
 int main(int argc, char *argv[])
 {
@@ -160,7 +172,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    for (size_t i = 0; i < fcount; ++i)
+    for (int i = 0; i < fcount; ++i)
     {
         memset(ram.data[i].chars, '\0', PAGE_SIZE);
     }
@@ -168,10 +180,9 @@ int main(int argc, char *argv[])
     struct FirstLevelPageTable pageTable;
     if (level == 1)
     {
-        // for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
-        // {
-        //     memset(pageTable.entries[i].bits, '0', sizeof(pageTable.entries[i].bits));
-        // }
+        for(int i = 0; i<VIRTUAL_MEMORY_SIZE; i++) {
+            pageTable.entries[i].bits = 0x0000;
+        }
     }
 
     if (level == 2)
@@ -210,11 +221,12 @@ int main(int argc, char *argv[])
         // page table access
         if (level == 1)
         {
-            bool pf = false;
+            int pf = 0;
             // INVALID
-            if (pageTable.entries[pageIndex].bits & V_MASK == 0)
+            printf("V BIT for page %d: %x",pageIndex,((int)pageTable.entries[pageIndex].bits & V_MASK) >> 15);
+            if (((int)pageTable.entries[pageIndex].bits & V_MASK ) >> 15 == 0)
             {
-                pf = true;
+                pf = 1;
                 totalPageFault = totalPageFault + 1;
                 printf("Page fault for page %d\n", pageIndex);
 
@@ -225,9 +237,10 @@ int main(int argc, char *argv[])
                 fread(buffer, PAGE_SIZE, 1, disc);
 
                 int ramIndex = -1;
-                for (size_t i = 0; i < ram->size; ++i)
+               
+                for (int i = 17; i < fcount; ++i)
                 {
-                    if (memcmp(ram.data[i].chars, "\0", PAGE_SIZE) == 0)
+                    if (hasNonNullOrNot(ram.data[i].chars) == 0)
                     {
                         printf("Empty space at ram index : %d \n", i);
                         ramIndex = i;
@@ -236,23 +249,23 @@ int main(int argc, char *argv[])
                 }
 
                 // There is empty space
-                if (ramIndex > 0)
+                if (ramIndex > -1)
                 {
                     for (int j = 0; j < PAGE_SIZE; ++j)
                     {
                         ram.data[ramIndex].chars[j] = buffer[j];
                     }
 
-                    pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits & 0x8000;
+                    pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits | 0x8000;
                     printf("Entry validated: %x\n", pageTable.entries[pageIndex].bits);
 
-                    pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits + k_lsb;
+                    pageTable.entries[pageIndex].bits = pageTable.entries[pageIndex].bits + ramIndex;
                     printf("Entry value now: %x\n", pageTable.entries[pageIndex].bits);
                 }
                 else
                 {
                     // THERE IS NO EMPTY SPACE, USE ALGO
-                    printf("ALGORITHM NOT IMPLEMENTED YET");
+                    printf("EMPTY SPACE NOT IMPLEMENTED YET\n");
                 }
             }
 
@@ -261,7 +274,7 @@ int main(int argc, char *argv[])
             unsigned int offsetValue = ram.data[ram_i].chars[offset];
             unsigned int pa = ram_i * PAGE_SIZE + offset;
 
-            if (pf)
+            if (pf ==1)
             {
                 fprintf(output, "%x %x %s %x %x %x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "");
             }
@@ -277,9 +290,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    free(ram->data);
-    ram->size = 0;
-    ram->data = NULL;
+    free(ram.data);
+    ram.data = 0;
+    ram.data = NULL;
     fclose(input);
     fclose(disc);
     fclose(output);
