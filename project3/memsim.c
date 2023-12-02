@@ -52,7 +52,7 @@ int hasNonNullOrNot(const char *str)
 {
     for (int i = 0; i < PAGE_SIZE; ++i)
     {
-        if (str[i] != '\0')
+        if (str[i] != '0')
         {
             return 1; 
         }
@@ -174,7 +174,7 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < fcount; ++i)
     {
-        memset(ram.data[i].chars, '\0', PAGE_SIZE);
+        memset(ram.data[i].chars, '0', PAGE_SIZE);
     }
 
     struct FirstLevelPageTable pageTable;
@@ -223,7 +223,6 @@ int main(int argc, char *argv[])
         {
             int pf = 0;
             // INVALID
-            printf("V BIT for page %d: %x",pageIndex,((int)pageTable.entries[pageIndex].bits & V_MASK) >> 15);
             if (((int)pageTable.entries[pageIndex].bits & V_MASK ) >> 15 == 0)
             {
                 pf = 1;
@@ -276,11 +275,11 @@ int main(int argc, char *argv[])
 
             if (pf ==1)
             {
-                fprintf(output, "%x %x %s %x %x %x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "");
+                fprintf(output, "%x %x %s %x %x %x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "pagefault");
             }
             else
             {
-                fprintf(output, "%x %x %s %x %x %x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "pagefault");
+                fprintf(output, "%x %x %s %x %x %x %s\n", virtualAddress, pageIndex, "", offset, ram_i, pa, "");
             }
         }
         else
