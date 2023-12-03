@@ -541,7 +541,7 @@ int main(int argc, char *argv[])
                             }
 
                             current = current->next;
-                        } while (found = 0;);
+                        } while (found == 0);
                     }
                 }
                 else
