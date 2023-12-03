@@ -13,6 +13,14 @@
 #define R_MASK 0x4000
 #define M_MASK 0x2000
 
+enum PageReplacementAlgorithm
+{
+    FIFO,
+    LRU,
+    CLOCK,
+    ECLOCK
+};
+
 // V+R+M+ UNUSED BITS + K BITS
 // V = 0 is invalid
 struct PageTableEntry
@@ -49,6 +57,8 @@ int tick;
 char outfile[100];
 
 RAM ram;
+
+int recent = 0;
 
 int totalPageFault = 0;
 
@@ -127,7 +137,7 @@ int main(int argc, char *argv[])
     }
 
     FILE *disc;
- 
+
     disc = fopen(swapfile, "w+b");
 
     if (disc == NULL)
@@ -143,8 +153,6 @@ int main(int argc, char *argv[])
     {
         fwrite(&zeroBuffer, sizeof(char), 1, disc);
     }
-    
-
 
     FILE *output = fopen(outfile, "w");
     if (output == NULL)
@@ -194,6 +202,25 @@ int main(int argc, char *argv[])
         }
     }
 
+    enum PageReplacementAlgorithm pAlgo;
+
+    if (algo == "FIFO")
+    {
+        pAlgo = FIFO;
+    }
+    else if (algo == "LRU")
+    {
+        pAlgo = LRU;
+    }
+    else if (algo == "CLOCK")
+    {
+        pAlgo = CLOCK;
+    }
+    else
+    {
+        pAlgo = ECLOCK;
+    }
+
     int k_lsb = (int)log2(fcount); // least significant k bits, to point frame no
 
     char line[256];
@@ -238,7 +265,7 @@ int main(int argc, char *argv[])
 
         int pf = 0;
         // INVALID
-        //printf("FIRST BIT OF ENTRY 0x%x: %d",pageTable->entries[pageIndex].bits,(pageTable->entries[pageIndex].bits >> 15));
+        // printf("FIRST BIT OF ENTRY 0x%x: %d",pageTable->entries[pageIndex].bits,(pageTable->entries[pageIndex].bits >> 15));
         if (((int)pageTable->entries[pageIndex].bits) >> 15 == 0)
         {
             pf = 1;
@@ -273,15 +300,75 @@ int main(int argc, char *argv[])
 
                 pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
                 pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
-               // printf("Entry %d validated & referenced: 0x%x\n", pageIndex, pageTable->entries[pageIndex].bits);
+                // printf("Entry %d validated & referenced: 0x%x\n", pageIndex, pageTable->entries[pageIndex].bits);
 
                 pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + ramIndex;
-                //printf("Entry value now: 0x%x\n", pageTable->entries[pageIndex].bits);
+                // printf("Entry value now: 0x%x\n", pageTable->entries[pageIndex].bits);
             }
             else
             {
-                // THERE IS NO EMPTY SPACE, USE ALGO
-                printf("EMPTY SPACE NOT IMPLEMENTED YET\n");
+                if (pAlgo == FIFO)
+                {
+
+                    // search for the page that first entered to ram
+                    for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
+                    {
+                        unsigned int entry = pageTable->entries[i].bits;
+                        // valid
+                        if (entry >> 15 == 1)
+                        {
+
+                            unsigned int ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
+
+                            // found
+                            if (ram_pointer == recent)
+                            {
+
+                                // modified, write to swap before removing page
+                                if ((entry & M_MASK) >> 13 == 1)
+                                {
+
+                                    if (level == 1)
+                                    {
+                                        fseek(disc, i * PAGE_SIZE, SEEK_SET);
+                                    }
+                                    else
+                                    {
+                                        fseek(disc, (pageIndex1 * SECOND_LEVEL_TABLE_SIZE + i) * PAGE_SIZE, SEEK_SET);
+                                    }
+
+                                    for (int k = 0; k < PAGE_SIZE; k++)
+                                    {
+                                        unsigned char c = ram.data[ram_pointer].chars[k];
+                                        fwrite(&c, sizeof(char), 1, disc);
+                                    }
+                                }
+                                printf("Page %d removed from RAM Frame %d\n", i, recent);
+                                pageTable->entries[i].bits = 0x0000;
+                                break;
+                            }
+                        }
+                    }
+                    for (int j = 0; j < PAGE_SIZE; ++j)
+                    {
+                        ram.data[recent].chars[j] = buffer[j];
+                    }
+
+                    pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
+                    pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
+                    pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + recent;
+                    printf("Page %d put into frame %d", pageIndex, recent);
+                    recent = (recent + 1) % fcount;
+                }
+                else if (pAlgo == LRU)
+                {
+                }
+                else if (pAlgo == CLOCK)
+                {
+                }
+                else
+                {
+                }
             }
         }
 
@@ -352,7 +439,7 @@ int main(int argc, char *argv[])
         {
 
             unsigned int entry = firstLevelPageTable.entries[i].bits;
-           // printf("entry: 0x%x, first bit: %d\n",entry,(firstLevelPageTable.entries[i].bits >> 15));
+            // printf("entry: 0x%x, first bit: %d\n",entry,(firstLevelPageTable.entries[i].bits >> 15));
 
             // if entry valid and in ram
             if (((int)firstLevelPageTable.entries[i].bits) >> 15 != 0)
@@ -360,11 +447,11 @@ int main(int argc, char *argv[])
                 unsigned int ram_i = entry & ((int)pow(2, k_lsb) - 1);
                 fseek(disc, i * PAGE_SIZE, SEEK_SET);
 
-                for(int k = 0; k<PAGE_SIZE;k++) {
+                for (int k = 0; k < PAGE_SIZE; k++)
+                {
                     unsigned char c = ram.data[ram_i].chars[k];
-                    //printf("wroting to file 0x%hhx\n",c);
-                    fwrite(&c,sizeof(char),1, disc);
-
+                    // printf("wroting to file 0x%hhx\n",c);
+                    fwrite(&c, sizeof(char), 1, disc);
                 }
             }
         }
@@ -376,16 +463,16 @@ int main(int argc, char *argv[])
             for (int j = 0; j < SECOND_LEVEL_TABLE_SIZE; j++)
             {
                 unsigned int entry = secondLevelPageTable.tables[i].entries[j].bits;
-                if ((entry & V_MASK) == 0x8000)
+                if (((int)firstLevelPageTable.entries[i].bits) >> 15 != 0)
                 {
                     unsigned int ram_i = entry & ((int)pow(2, k_lsb) - 1);
-                    fseek(disc, (i*SECOND_LEVEL_TABLE_SIZE + j )* PAGE_SIZE, SEEK_SET);
-                   
-                   for(int k = 0; k<PAGE_SIZE;k++) {
-                        unsigned char c = ram.data[ram_i].chars[k];
-                        //printf("wroting to file 0x%hhx\n",c);
-                        fwrite(&c,sizeof(char),1, disc);
+                    fseek(disc, (i * SECOND_LEVEL_TABLE_SIZE + j) * PAGE_SIZE, SEEK_SET);
 
+                    for (int k = 0; k < PAGE_SIZE; k++)
+                    {
+                        unsigned char c = ram.data[ram_i].chars[k];
+                        // printf("wroting to file 0x%hhx\n",c);
+                        fwrite(&c, sizeof(char), 1, disc);
                     }
                 }
             }
