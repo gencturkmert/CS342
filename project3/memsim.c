@@ -483,11 +483,15 @@ int main(int argc, char *argv[])
                             // check for valid, it supposed to be valid
                             if (entry >> 15 == 1)
                             {
+                                // found
                                 if ((entry & R_MASK) >> 14 == 0)
                                 {
                                     found = 1;
+                                    // remove from clockList
                                     removeFromList(&clockList, pi);
                                     unsigned int ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
+
+                                    // save to swap if modified
                                     if ((entry & M_MASK) >> 13 == 1)
                                     {
 
@@ -501,6 +505,7 @@ int main(int argc, char *argv[])
                                     }
                                     printf("Page %d removed from RAM Frame %d\n", pi, recent);
 
+                                    // reset page table entry
                                     if (level == 1)
                                     {
                                         firstLevelPageTable.entries[pi].bits = 0x0000;
@@ -510,13 +515,19 @@ int main(int argc, char *argv[])
                                         secondLevelPageTable.tables[(int)(pi / SECOND_LEVEL_TABLE_SIZE)].entries[pi % SECOND_LEVEL_TABLE_SIZE].bits = 0x0000;
                                     }
 
+                                    for (int j = 0; j < PAGE_SIZE; ++j)
+                                    {
+                                        ram.data[ram_pointer].chars[j] = buffer[j];
+                                    }
+
+                                    // put corresponding page tabble entry to valid & referenced and ram index
                                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
                                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
                                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + ram_pointer;
                                     printf("Page %d put into frame %d\n", pageIndex, ram_pointer);
                                     break;
                                 }
-                                else
+                                else // not found, set r bit to 0
                                 {
                                     if (level == 1)
                                     {
