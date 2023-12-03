@@ -4,8 +4,8 @@
 LEVEL=2
 ADDRFILE="addr.txt"
 SWAPFILE="swapfile.bin"
-FCOUNT=64
-ALGO="lru"
+FCOUNT=4
+ALGO="LRU"
 TICK=100
 OUTFILE="output.txt"
 

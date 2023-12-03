@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <math.h>
+#include <limits.h>
 
 #define PAGE_SIZE 64
 #define VIRTUAL_MEMORY_SIZE 1024
@@ -60,7 +61,7 @@ char outfile[100];
 RAM ram;
 
 // For fifo implementation
-int recent = 0;
+unsigned int recent = 0;
 
 // for lru implementation
 int clock = 0;
@@ -209,15 +210,15 @@ int main(int argc, char *argv[])
 
     enum PageReplacementAlgorithm pAlgo;
 
-    if (algo == "FIFO")
+    if (strcmp(algo,"FIFO")==0)
     {
         pAlgo = FIFO;
     }
-    else if (algo == "LRU")
+    else if (strcmp(algo,"LRU")==0)
     {
         pAlgo = LRU;
     }
-    else if (algo == "CLOCK")
+    else if (strcmp(algo,"CLOCK"))
     {
         pAlgo = CLOCK;
     }
@@ -370,7 +371,7 @@ int main(int argc, char *argv[])
                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + recent;
-                    printf("Page %d put into frame %d", pageIndex, recent);
+                    printf("Page %d put into frame %d\n", pageIndex, recent);
                     recent = (recent + 1) % fcount;
                 }
                 else if (pAlgo == LRU)
@@ -391,10 +392,10 @@ int main(int argc, char *argv[])
                             }
                         }
 
+                        ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
                         if ((entry & M_MASK) >> 13 == 1)
                         {
                             fseek(disc, min * PAGE_SIZE, SEEK_SET);
-                            ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
                             for (int k = 0; k < PAGE_SIZE; k++)
                             {
                                 unsigned char c = ram.data[ram_pointer].chars[k];
@@ -421,10 +422,10 @@ int main(int argc, char *argv[])
                             }
                         }
 
+                        ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
                         if ((secondLevelPageTable.tables[pi1].entries[min].bits & M_MASK) >> 13 == 1)
                         {
                             fseek(disc, (pi1 * SECOND_LEVEL_TABLE_SIZE + min) * PAGE_SIZE, SEEK_SET);
-                            ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
                             for (int k = 0; k < PAGE_SIZE; k++)
                             {
                                 unsigned char c = ram.data[ram_pointer].chars[k];
@@ -445,7 +446,7 @@ int main(int argc, char *argv[])
                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + ram_pointer;
-                    printf("Page %d put into frame %d", pageIndex, ram_pointer);
+                    printf("Page %d put into frame %d\n", pageIndex, ram_pointer);
                 }
                 else if (pAlgo == CLOCK)
                 {
