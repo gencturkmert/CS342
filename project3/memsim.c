@@ -26,6 +26,7 @@ enum PageReplacementAlgorithm
 struct PageTableEntry
 {
     unsigned short int bits;
+    int clock;
 };
 
 struct FirstLevelPageTable
@@ -58,7 +59,11 @@ char outfile[100];
 
 RAM ram;
 
+// For fifo implementation
 int recent = 0;
+
+// for lru implementation
+int clock = 0;
 
 int totalPageFault = 0;
 
@@ -231,6 +236,7 @@ int main(int argc, char *argv[])
 
     while (fgets(line, sizeof(line), input) != NULL)
     {
+        clock = clock + 1;
 
         if (sscanf(line, " %c %x 0x%hhx", &mode, &virtualAddress, &value) == 3 && mode == 'w')
         {
@@ -274,7 +280,14 @@ int main(int argc, char *argv[])
 
             char buffer[64];
 
-            fseek(disc, pageIndex * PAGE_SIZE, SEEK_SET);
+            if (level == 1)
+            {
+                fseek(disc, pageIndex * PAGE_SIZE, SEEK_SET);
+            }
+            else
+            {
+                fseek(disc, (pageIndex1 * SECOND_LEVEL_TABLE_SIZE + pageIndex) * PAGE_SIZE, SEEK_SET);
+            }
 
             fread(buffer, PAGE_SIZE, 1, disc);
 
@@ -362,6 +375,77 @@ int main(int argc, char *argv[])
                 }
                 else if (pAlgo == LRU)
                 {
+                    unsigned int entry = 0x0000;
+                    int min = 0;
+                    int minClock = INT_MAX;
+                    unsigned int ram_pointer;
+                    if (level == 1)
+                    {
+                        for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
+                        {
+                            if (firstLevelPageTable.entries[i].bits >> 15 == 1 && firstLevelPageTable.entries[i].clock < minClock)
+                            {
+                                min = i;
+                                minClock = firstLevelPageTable.entries[i].clock;
+                                entry = firstLevelPageTable.entries[i].bits;
+                            }
+                        }
+
+                        if ((entry & M_MASK) >> 13 == 1)
+                        {
+                            fseek(disc, min * PAGE_SIZE, SEEK_SET);
+                            ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
+                            for (int k = 0; k < PAGE_SIZE; k++)
+                            {
+                                unsigned char c = ram.data[ram_pointer].chars[k];
+                                fwrite(&c, sizeof(char), 1, disc);
+                            }
+                        }
+
+                        firstLevelPageTable.entries[min].bits = 0x0000;
+                    }
+                    else
+                    {
+                        int pi1 = 0;
+                        for (int i = 0; i < SECOND_LEVEL_TABLE_SIZE; i++)
+                        {
+                            for (int j = 0; j < SECOND_LEVEL_TABLE_SIZE; j++)
+                            {
+                                if (secondLevelPageTable.tables[i].entries[j].bits >> 15 == 1 && secondLevelPageTable.tables[i].entries[j].clock < minClock)
+                                {
+                                    pi1 = i;
+                                    min = j;
+                                    minClock = secondLevelPageTable.tables[i].entries[j].clock;
+                                    entry = secondLevelPageTable.tables[i].entries[j].bits;
+                                }
+                            }
+                        }
+
+                        if ((secondLevelPageTable.tables[pi1].entries[min].bits & M_MASK) >> 13 == 1)
+                        {
+                            fseek(disc, (pi1 * SECOND_LEVEL_TABLE_SIZE + min) * PAGE_SIZE, SEEK_SET);
+                            ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
+                            for (int k = 0; k < PAGE_SIZE; k++)
+                            {
+                                unsigned char c = ram.data[ram_pointer].chars[k];
+                                fwrite(&c, sizeof(char), 1, disc);
+                            }
+                        }
+
+                        secondLevelPageTable.tables[pi1].entries[min].bits = 0x000;
+                    }
+
+                    printf("Page %d removed from RAM Frame %d\n", min, ram_pointer);
+
+                    for (int j = 0; j < PAGE_SIZE; ++j)
+                    {
+                        ram.data[ram_pointer].chars[j] = buffer[j];
+                    }
+
+                    pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
+                    pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
+                    pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + ram_pointer;
+                    printf("Page %d put into frame %d", pageIndex, ram_pointer);
                 }
                 else if (pAlgo == CLOCK)
                 {
@@ -403,6 +487,11 @@ int main(int argc, char *argv[])
             {
                 printf("(Old value 0x%x) New value 0x%hhx is written to (page %d - page %d) to frame %d \n", offsetValue, newVal, pageIndex1, pageIndex, ram_i);
             }
+        }
+
+        if (pAlgo == LRU)
+        {
+            pageTable->entries[pageIndex].clock = clock;
         }
 
         // to do reminder: kısalt
