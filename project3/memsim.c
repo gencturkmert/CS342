@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <limits.h>
+#include "CLOCK_LIST.H"
 
 #define PAGE_SIZE 64
 #define VIRTUAL_MEMORY_SIZE 1024
@@ -210,15 +211,15 @@ int main(int argc, char *argv[])
 
     enum PageReplacementAlgorithm pAlgo;
 
-    if (strcmp(algo,"FIFO")==0)
+    if (strcmp(algo, "FIFO") == 0)
     {
         pAlgo = FIFO;
     }
-    else if (strcmp(algo,"LRU")==0)
+    else if (strcmp(algo, "LRU") == 0)
     {
         pAlgo = LRU;
     }
-    else if (strcmp(algo,"CLOCK"))
+    else if (strcmp(algo, "CLOCK"))
     {
         pAlgo = CLOCK;
     }
@@ -226,6 +227,9 @@ int main(int argc, char *argv[])
     {
         pAlgo = ECLOCK;
     }
+
+    struct ClockList clockList;
+    initializeList(&clockList);
 
     int k_lsb = (int)log2(fcount); // least significant k bits, to point frame no
 
@@ -327,7 +331,15 @@ int main(int argc, char *argv[])
                     // search for the page that first entered to ram
                     for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
                     {
-                        unsigned int entry = pageTable->entries[i].bits;
+                        unsigned int entry = 0x000;
+                        if (level == 1)
+                        {
+                            entry = firstLevelPageTable.entries[i].bits;
+                        }
+                        else
+                        {
+                            entry = secondLevelPageTable.tables[(int)(i / SECOND_LEVEL_TABLE_SIZE)].entries[i % SECOND_LEVEL_TABLE_SIZE].bits;
+                        }
                         // valid
                         if (entry >> 15 == 1)
                         {
@@ -450,6 +462,46 @@ int main(int argc, char *argv[])
                 }
                 else if (pAlgo == CLOCK)
                 {
+                    struct Node *current = clockList.head;
+                    if (current != NULL)
+                    {
+                        int found = 0;
+                        do
+                        {
+                            unsigned int pi = current->data;
+                            unsigned int entry = 0x0000;
+                            if (level == 1)
+                            {
+                                entry = firstLevelPageTable.entries[pi].bits;
+                            }
+                            else
+                            {
+                                entry = secondLevelPageTable.tables[(int)(pi / SECOND_LEVEL_TABLE_SIZE)].entries[pi % SECOND_LEVEL_TABLE_SIZE].bits;
+                            }
+
+                            // check for valid, it supposed to be valid
+                            if (entry >> 15 == 1)
+                            {
+                                if ((entry & R_MASK) >> 14 == 0)
+                                {
+                                    found = 1;
+                                                                }
+                                else
+                                {
+                                    if (level == 1)
+                                    {
+                                        firstLevelPageTable.entries[pi].bits = entry & 0xBFF;
+                                    }
+                                    else
+                                    {
+                                        secondLevelPageTable.tables[(int)(pi / SECOND_LEVEL_TABLE_SIZE)].entries[pi % SECOND_LEVEL_TABLE_SIZE].bits = entry & 0xBFF;
+                                    }
+                                }
+                            }
+
+                            current = current->next;
+                        } while (found = 0;);
+                    }
                 }
                 else
                 {
@@ -493,6 +545,18 @@ int main(int argc, char *argv[])
         if (pAlgo == LRU)
         {
             pageTable->entries[pageIndex].clock = clock;
+        }
+
+        if (pAlgo == CLOCK)
+        {
+            if (level == 1)
+            {
+                addToTail(&clockList, pageIndex);
+            }
+            else
+            {
+                addToTail(&clockList, pageIndex1 * SECOND_LEVEL_TABLE_SIZE + pageIndex);
+            }
         }
 
         // to do reminder: kısalt
