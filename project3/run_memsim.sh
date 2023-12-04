@@ -11,4 +11,3 @@ OUTFILE="output.txt"
 
 # Run memsim with the specified parameters
 ./memsim -p $LEVEL -r $ADDRFILE -s $SWAPFILE -f $FCOUNT -a $ALGO -t $TICK -o $OUTFILE
-xxd -c 64 -g 1 swapfile.bin > swap.txt
