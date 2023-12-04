@@ -556,7 +556,7 @@ int main(int argc, char *argv[])
                 {
                     struct Node *current = clockList.head;
                     unsigned int pi = 0;
-                    int step = 0;
+                    int step = 1;
                     if (current != NULL)
                     {
                         int loop = 0;
@@ -585,7 +585,7 @@ int main(int argc, char *argv[])
                             if (entry >> 15 == 1)
                             {
                                 // found
-                                if (step == 0 && (entry & R_MASK) >> 14 == 0 && (entry & M_MASK) >> 13 == 0)
+                                if (step == 1 && (entry & R_MASK) >> 14 == 0 && (entry & M_MASK) >> 13 == 0)
                                 {
                                     found = 1;
                                     // remove from clockList
@@ -733,7 +733,7 @@ int main(int argc, char *argv[])
                                         break;
                                     }
                                 }
-                                if (step == 3)
+                                if (step == 4)
                                 {
                                     if ((entry & R_MASK) >> 14 == 0 && (entry & M_MASK) >> 13 == 1)
                                     {
@@ -831,7 +831,7 @@ int main(int argc, char *argv[])
             pageTable->entries[pageIndex].clock = clock;
         }
 
-        if (pAlgo == CLOCK)
+        if (pAlgo == CLOCK || pAlgo == ECLOCK)
         {
             if (level == 1)
             {
