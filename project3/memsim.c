@@ -358,7 +358,7 @@ int main(int argc, char *argv[])
                         {
                             entry = secondLevelPageTable.tables[(int)(i / SECOND_LEVEL_TABLE_SIZE)].entries[i % SECOND_LEVEL_TABLE_SIZE].bits;
                         }
-                        printf("FOR PAGE %d ENTRY: 0x%x", i, entry);
+                        //printf("FOR PAGE %d ENTRY: 0x%x", i, entry);
                         // valid
                         if (entry >> 15 == 1)
                         {
