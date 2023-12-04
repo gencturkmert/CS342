@@ -243,7 +243,6 @@ int main(int argc, char *argv[])
 
     while (fgets(line, sizeof(line), input) != NULL)
     {
-        tickCount = (tickCount + 1) % tick;
         if (tickCount == 0)
         {
             // reset r bits when tick reference made
@@ -259,6 +258,7 @@ int main(int argc, char *argv[])
                 }
             }
         }
+        tickCount = (tickCount + 1) % tick;
         clock = clock + 1;
 
         if (sscanf(line, " %c %x 0x%hhx", &mode, &virtualAddress, &value) == 3 && mode == 'w')
