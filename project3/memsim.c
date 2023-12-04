@@ -281,7 +281,7 @@ int main(int argc, char *argv[])
         {
             pf = 1;
             totalPageFault = totalPageFault + 1;
-            //printf("Page fault for page %d\n", pageIndex);
+            // printf("Page fault for page %d\n", pageIndex);
 
             char buffer[64];
 
@@ -340,7 +340,7 @@ int main(int argc, char *argv[])
                         {
                             entry = secondLevelPageTable.tables[(int)(i / SECOND_LEVEL_TABLE_SIZE)].entries[i % SECOND_LEVEL_TABLE_SIZE].bits;
                         }
-                        printf("FOR PAGE %d ENTRY: 0x%x",i,entry);
+                        printf("FOR PAGE %d ENTRY: 0x%x", i, entry);
                         // valid
                         if (entry >> 15 == 1)
                         {
@@ -471,10 +471,11 @@ int main(int argc, char *argv[])
                         int found = 0;
                         do
                         {
-                            if(current == NULL) {
+                            if (current == NULL)
+                            {
                                 current = clockList.head;
                             }
-                            
+
                             pi = current->data;
                             unsigned int entry = 0x0000;
                             if (level == 1)
@@ -487,13 +488,12 @@ int main(int argc, char *argv[])
                             }
 
                             // check for valid, it supposed to be valid
-                            //printf("PI %d CLOCK ENTRY : 0x%x \n",pi,entry);
+                            // printf("PI %d CLOCK ENTRY : 0x%x \n",pi,entry);
                             if (entry >> 15 == 1)
                             {
                                 // found
                                 if ((entry & R_MASK) >> 14 == 0)
                                 {
-                                    //printf("FOUND\n");
                                     found = 1;
                                     // remove from clockList
                                     removeFromList(&clockList, pi);
@@ -532,12 +532,11 @@ int main(int argc, char *argv[])
                                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
                                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
                                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + ram_pointer;
-                                    printf("Page %d put into frame %d\n",  (pageIndex1 * SECOND_LEVEL_TABLE_SIZE)+ pageIndex, ram_pointer);
+                                    printf("Page %d put into frame %d\n", (pageIndex1 * SECOND_LEVEL_TABLE_SIZE) + pageIndex, ram_pointer);
                                     break;
                                 }
                                 else // not found, set r bit to 0
                                 {
-                                    //printf("SETTING R BIT OF PI %d AND ENTRY 0x%x TO 0\n",pi,entry);
                                     if (level == 1)
                                     {
                                         firstLevelPageTable.entries[pi].bits = entry & 0xBFFF;
@@ -550,14 +549,245 @@ int main(int argc, char *argv[])
                             }
 
                             current = current->next;
-                        } while (found == 0 );
-                        //printf("CLOCK LOOP ENDED");
+                        } while (found == 0);
                     }
-                    //printf("NULL HEAD");
                 }
                 else
                 {
-                    printf("UNIMPLEMENTED\n");
+                    struct Node *current = clockList.head;
+                    unsigned int pi = 0;
+                    int step = 0;
+                    if (current != NULL)
+                    {
+                        int loop = 0;
+                        int found = 0;
+                        do
+                        {
+                            if (current == NULL)
+                            {
+                                current = clockList.head;
+                                step = step + 1;
+                            }
+
+                            pi = current->data;
+                            unsigned int entry = 0x0000;
+                            if (level == 1)
+                            {
+                                entry = firstLevelPageTable.entries[pi].bits;
+                            }
+                            else
+                            {
+                                entry = secondLevelPageTable.tables[(int)(pi / SECOND_LEVEL_TABLE_SIZE)].entries[pi % SECOND_LEVEL_TABLE_SIZE].bits;
+                            }
+
+                            // check for valid, it supposed to be valid
+                            // printf("PI %d CLOCK ENTRY : 0x%x \n",pi,entry);
+                            if (entry >> 15 == 1)
+                            {
+                                // found
+                                if (step == 0 && (entry & R_MASK) >> 14 == 0 && (entry & M_MASK) >> 13 == 0)
+                                {
+                                    found = 1;
+                                    // remove from clockList
+                                    removeFromList(&clockList, pi);
+                                    unsigned int ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
+
+                                    // save to swap if modified
+                                    if ((entry & M_MASK) >> 13 == 1)
+                                    {
+
+                                        fseek(disc, pi * PAGE_SIZE, SEEK_SET);
+
+                                        for (int k = 0; k < PAGE_SIZE; k++)
+                                        {
+                                            unsigned char c = ram.data[ram_pointer].chars[k];
+                                            fwrite(&c, sizeof(char), 1, disc);
+                                        }
+                                    }
+                                    printf("Page %d removed from RAM Frame %d\n", pi, ram_pointer);
+
+                                    // reset page table entry
+                                    if (level == 1)
+                                    {
+                                        firstLevelPageTable.entries[pi].bits = 0x0000;
+                                    }
+                                    else
+                                    {
+                                        secondLevelPageTable.tables[(int)(pi / SECOND_LEVEL_TABLE_SIZE)].entries[pi % SECOND_LEVEL_TABLE_SIZE].bits = 0x0000;
+                                    }
+
+                                    for (int j = 0; j < PAGE_SIZE; ++j)
+                                    {
+                                        ram.data[ram_pointer].chars[j] = buffer[j];
+                                    }
+
+                                    // put corresponding page tabble entry to valid & referenced and ram index
+                                    pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
+                                    pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
+                                    pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + ram_pointer;
+                                    printf("Page %d put into frame %d\n", (pageIndex1 * SECOND_LEVEL_TABLE_SIZE) + pageIndex, ram_pointer);
+                                    break;
+                                }
+
+                                if (step == 2)
+                                {
+                                    if ((entry & R_MASK) >> 14 == 0 && (entry & M_MASK) >> 13 == 1)
+                                    {
+                                        found = 1;
+                                        // remove from clockList
+                                        removeFromList(&clockList, pi);
+                                        unsigned int ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
+
+                                        // save to swap if modified
+                                        if ((entry & M_MASK) >> 13 == 1)
+                                        {
+
+                                            fseek(disc, pi * PAGE_SIZE, SEEK_SET);
+
+                                            for (int k = 0; k < PAGE_SIZE; k++)
+                                            {
+                                                unsigned char c = ram.data[ram_pointer].chars[k];
+                                                fwrite(&c, sizeof(char), 1, disc);
+                                            }
+                                        }
+                                        printf("Page %d removed from RAM Frame %d\n", pi, ram_pointer);
+
+                                        // reset page table entry
+                                        if (level == 1)
+                                        {
+                                            firstLevelPageTable.entries[pi].bits = 0x0000;
+                                        }
+                                        else
+                                        {
+                                            secondLevelPageTable.tables[(int)(pi / SECOND_LEVEL_TABLE_SIZE)].entries[pi % SECOND_LEVEL_TABLE_SIZE].bits = 0x0000;
+                                        }
+
+                                        for (int j = 0; j < PAGE_SIZE; ++j)
+                                        {
+                                            ram.data[ram_pointer].chars[j] = buffer[j];
+                                        }
+
+                                        // put corresponding page tabble entry to valid & referenced and ram index
+                                        pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
+                                        pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
+                                        pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + ram_pointer;
+                                        printf("Page %d put into frame %d\n", (pageIndex1 * SECOND_LEVEL_TABLE_SIZE) + pageIndex, ram_pointer);
+                                        break;
+                                    }
+                                    else // not found, set r bit to 0
+                                    {
+                                        if (level == 1)
+                                        {
+                                            firstLevelPageTable.entries[pi].bits = entry & 0xBFFF;
+                                        }
+                                        else
+                                        {
+                                            secondLevelPageTable.tables[(int)(pi / SECOND_LEVEL_TABLE_SIZE)].entries[pi % SECOND_LEVEL_TABLE_SIZE].bits = entry & 0xBFFF;
+                                        }
+                                    }
+                                }
+
+                                if (step == 3)
+                                {
+                                    if ((entry & R_MASK) >> 14 == 0 && (entry & M_MASK) >> 13 == 0)
+                                    {
+                                        found = 1;
+                                        // remove from clockList
+                                        removeFromList(&clockList, pi);
+                                        unsigned int ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
+
+                                        // save to swap if modified
+                                        if ((entry & M_MASK) >> 13 == 1)
+                                        {
+
+                                            fseek(disc, pi * PAGE_SIZE, SEEK_SET);
+
+                                            for (int k = 0; k < PAGE_SIZE; k++)
+                                            {
+                                                unsigned char c = ram.data[ram_pointer].chars[k];
+                                                fwrite(&c, sizeof(char), 1, disc);
+                                            }
+                                        }
+                                        printf("Page %d removed from RAM Frame %d\n", pi, ram_pointer);
+
+                                        // reset page table entry
+                                        if (level == 1)
+                                        {
+                                            firstLevelPageTable.entries[pi].bits = 0x0000;
+                                        }
+                                        else
+                                        {
+                                            secondLevelPageTable.tables[(int)(pi / SECOND_LEVEL_TABLE_SIZE)].entries[pi % SECOND_LEVEL_TABLE_SIZE].bits = 0x0000;
+                                        }
+
+                                        for (int j = 0; j < PAGE_SIZE; ++j)
+                                        {
+                                            ram.data[ram_pointer].chars[j] = buffer[j];
+                                        }
+
+                                        // put corresponding page tabble entry to valid & referenced and ram index
+                                        pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
+                                        pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
+                                        pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + ram_pointer;
+                                        printf("Page %d put into frame %d\n", (pageIndex1 * SECOND_LEVEL_TABLE_SIZE) + pageIndex, ram_pointer);
+                                        break;
+                                    }
+                                }
+                                if (step == 3)
+                                {
+                                    if ((entry & R_MASK) >> 14 == 0 && (entry & M_MASK) >> 13 == 1)
+                                    {
+                                        found = 1;
+                                        // remove from clockList
+                                        removeFromList(&clockList, pi);
+                                        unsigned int ram_pointer = entry & ((int)pow(2, k_lsb) - 1);
+
+                                        // save to swap if modified
+                                        if ((entry & M_MASK) >> 13 == 1)
+                                        {
+
+                                            fseek(disc, pi * PAGE_SIZE, SEEK_SET);
+
+                                            for (int k = 0; k < PAGE_SIZE; k++)
+                                            {
+                                                unsigned char c = ram.data[ram_pointer].chars[k];
+                                                fwrite(&c, sizeof(char), 1, disc);
+                                            }
+                                        }
+                                        printf("Page %d removed from RAM Frame %d\n", pi, ram_pointer);
+
+                                        // reset page table entry
+                                        if (level == 1)
+                                        {
+                                            firstLevelPageTable.entries[pi].bits = 0x0000;
+                                        }
+                                        else
+                                        {
+                                            secondLevelPageTable.tables[(int)(pi / SECOND_LEVEL_TABLE_SIZE)].entries[pi % SECOND_LEVEL_TABLE_SIZE].bits = 0x0000;
+                                        }
+
+                                        for (int j = 0; j < PAGE_SIZE; ++j)
+                                        {
+                                            ram.data[ram_pointer].chars[j] = buffer[j];
+                                        }
+
+                                        // put corresponding page tabble entry to valid & referenced and ram index
+                                        pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
+                                        pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
+                                        pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + ram_pointer;
+                                        printf("Page %d put into frame %d\n", (pageIndex1 * SECOND_LEVEL_TABLE_SIZE) + pageIndex, ram_pointer);
+                                        break;
+                                    }
+                                }
+                            }
+                            current = current->next;
+                        } while (found == 0);
+                    }
+                    else
+                    {
+                        printf("Circular List Error, exiting...");
+                        return 1;
+                    }
                 }
             }
         }
@@ -611,7 +841,6 @@ int main(int argc, char *argv[])
             {
                 addToTail(&clockList, pageIndex1 * SECOND_LEVEL_TABLE_SIZE + pageIndex);
             }
-
         }
 
         // to do reminder: kısalt
@@ -641,16 +870,18 @@ int main(int argc, char *argv[])
     }
 
     fprintf(output, "Page Fault No: %d", totalPageFault);
-   
+
     for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
     {
 
         unsigned int entry;
-        if(level == 1) {
+        if (level == 1)
+        {
             entry = firstLevelPageTable.entries[i].bits;
-
-        }else{
-            entry = secondLevelPageTable.tables[(int)(i/32)].entries[i%32].bits;
+        }
+        else
+        {
+            entry = secondLevelPageTable.tables[(int)(i / 32)].entries[i % 32].bits;
         }
         // printf("entry: 0x%x, first bit: %d\n",entry,(firstLevelPageTable.entries[i].bits >> 15));
 
@@ -668,8 +899,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-    
-    
 
     free(ram.data);
     ram.data = 0;
