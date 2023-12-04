@@ -2,11 +2,11 @@
 
 # Example parameters
 LEVEL=2
-ADDRFILE="addr.txt"
+ADDRFILE="addrs.txt"
 SWAPFILE="swapfile.bin"
-FCOUNT=4
+FCOUNT=16
 ALGO="CLOCK"
-TICK=100
+TICK=10
 OUTFILE="output.txt"
 
 # Run memsim with the specified parameters

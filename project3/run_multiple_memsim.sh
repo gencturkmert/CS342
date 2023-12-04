@@ -1,9 +1,9 @@
 #!/bin/bash
 
 LEVEL=2
-ADDRFILE="addr.txt"
+ADDRFILE="addrs.txt"
 SWAPFILE="swapfile.bin"
-TICK=100
+TICK=10
 
 # Loop over different algorithms and frame counts
 for ALGO in "FIFO" "LRU" "CLOCK" "ECLOCK"; do
