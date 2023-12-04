@@ -59,6 +59,8 @@ char algo[10];
 int tick;
 char outfile[100];
 
+int tickCount = 0;
+
 RAM ram;
 
 // For fifo implementation
@@ -241,6 +243,22 @@ int main(int argc, char *argv[])
 
     while (fgets(line, sizeof(line), input) != NULL)
     {
+        tickCount = (tickCount + 1) % tick;
+        if (tickCount == 0)
+        {
+            // reset r bits when tick reference made
+            for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
+            {
+                if (level == 1)
+                {
+                    firstLevelPageTable.entries[i].bits = firstLevelPageTable.entries[i].bits & 0xBFFF;
+                }
+                else
+                {
+                    secondLevelPageTable.tables[(int)(i / 32)].entries[i % 32].bits = secondLevelPageTable.tables[(int)(i / 32)].entries[i % 32].bits & 0xBFFF;
+                }
+            }
+        }
         clock = clock + 1;
 
         if (sscanf(line, " %c %x 0x%hhx", &mode, &virtualAddress, &value) == 3 && mode == 'w')
