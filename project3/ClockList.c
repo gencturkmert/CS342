@@ -1,99 +1,91 @@
-#include "clocklist.h"
+#include "ClockList.h"
 #include <stdio.h>
 #include <stdlib.h>
-
-void initializeList(struct ClockList *list)
-{
+void initializeList(struct ClockList* list) {
     list->head = NULL;
+    list->tail = NULL;
 }
 
-void insertAtBeginning(struct ClockList *list, unsigned int data)
-{
-    struct Node *newNode = (struct Node *)malloc(sizeof(struct Node));
-    newNode->data = data;
+// Function to remove a node with the specified data from the list
+void removeFromList(struct ClockList* list, unsigned int data) {
+    struct Node* current = list->head;
+    struct Node* previous = NULL;
 
-    if (list->head == NULL)
-    {
-        newNode->next = newNode;
-        list->head = newNode;
-    }
-    else
-    {
-        newNode->next = list->head->next;
-        list->head->next = newNode;
+    while (current != NULL) {
+        if (current->data == data) {
+            if (previous == NULL) {
+                // If the node to be removed is the head
+                list->head = current->next;
+                free(current);
+                return;
+            } else {
+                previous->next = current->next;
+                // If the node to be removed is the tail, update tail
+                if (current == list->tail) {
+                    list->tail = previous;
+                }
+                free(current);
+                return;
+            }
+        }
+        previous = current;
+        current = current->next;
     }
 }
 
-void removeFromList(struct ClockList *list, unsigned int data)
-{
-    if (list->head == NULL)
-    {
-        return;
-    }
-
-    struct Node *current = list->head;
-    struct Node *prev = NULL;
-
-    do
-    {
-        if (current->data == data)
-        {
-            if (prev == NULL)
-            {
-                if (current->next == current)
-                {
-                    list->head = NULL;
-                }
-                else
-                {
-                    list->head = current->next;
-                }
-            }
-            else
-            {
-                prev->next = current->next;
-            }
-            free(current);
+// Function to add a new node with the specified data to the tail of the list
+void addToTail(struct ClockList* list, unsigned int data) {
+    struct Node* current = list->head;
+    while (current != NULL) {
+        if (current->data == data) {
             return;
         }
-
-        prev = current;
         current = current->next;
+    }
+    struct Node* newNode = (struct Node*)malloc(sizeof(struct Node));
+    if (newNode == NULL) {
+        fprintf(stderr, "Memory allocation error\n");
+        exit(EXIT_FAILURE);
+    }
 
-    } while (current != list->head);
-}
-
-void addToTail(struct ClockList *list, unsigned int data)
-{
-    struct Node *newNode = (struct Node *)malloc(sizeof(struct Node));
     newNode->data = data;
+    newNode->next = NULL;
 
-    if (list->head == NULL)
-    {
-        newNode->next = newNode;
+    if (list->tail == NULL) {
+        // If the list is empty, set both head and tail to the new node
         list->head = newNode;
-    }
-    else
-    {
-        newNode->next = list->head->next;
-        list->head->next = newNode;
-        list->head = newNode;
+        list->tail = newNode;
+    } else {
+        // Add the new node to the tail and update the tail
+        list->tail->next = newNode;
+        list->tail = newNode;
     }
 }
 
-void printList(struct ClockList *list)
-{
-    if (list->head == NULL)
-    {
-        printf("List is empty\n");
-        return;
-    }
+// Function to print the elements of the list
+void printList(struct ClockList* list) {
+    struct Node* current = list->head;
 
-    struct Node *current = list->head;
-    do
-    {
+    printf("List: ");
+    while (current != NULL) {
         printf("%u ", current->data);
         current = current->next;
-    } while (current != list->head);
+    }
     printf("\n");
+}
+
+// Function to free the memory allocated for the nodes in the list
+void freeList(struct ClockList* list) {
+    struct Node* current = list->head;
+    struct Node* next;
+
+    while (current != NULL) {
+        next = current->next;
+        free(current);
+        current = next;
+    }
+
+    // Reset the list to an empty state
+    list->head = NULL;
+    list->tail = NULL;
 }

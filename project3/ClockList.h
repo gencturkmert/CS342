@@ -10,10 +10,10 @@ struct Node
 struct ClockList
 {
     struct Node *head;
+    struct Node* tail;
 };
 
 void initializeList(struct ClockList *list);
-void insertAtBeginning(struct ClockList *list, unsigned int data);
 void removeFromList(struct ClockList *list, unsigned int data);
 void addToTail(struct ClockList *list, unsigned int data);
 void printList(struct ClockList *list);

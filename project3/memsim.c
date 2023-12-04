@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <limits.h>
-#include "CLOCK_LIST.H"
+#include "ClockList.h"
 
 #define PAGE_SIZE 64
 #define VIRTUAL_MEMORY_SIZE 1024
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
     printf("addrfile: %s\n", addrfile);
     printf("swapfile: %s\n", swapfile);
     printf("fcount: %d\n", fcount);
-    printf("algo: %s\n", algo);
+    printf("algo: -%s-\n", algo);
     printf("tick: %d\n", tick);
     printf("outfile: %s\n", outfile);
 
@@ -219,7 +219,7 @@ int main(int argc, char *argv[])
     {
         pAlgo = LRU;
     }
-    else if (strcmp(algo, "CLOCK"))
+    else if (strcmp(algo, "CLOCK") == 0)
     {
         pAlgo = CLOCK;
     }
@@ -281,7 +281,7 @@ int main(int argc, char *argv[])
         {
             pf = 1;
             totalPageFault = totalPageFault + 1;
-            printf("Page fault for page %d\n", pageIndex);
+            //printf("Page fault for page %d\n", pageIndex);
 
             char buffer[64];
 
@@ -340,6 +340,7 @@ int main(int argc, char *argv[])
                         {
                             entry = secondLevelPageTable.tables[(int)(i / SECOND_LEVEL_TABLE_SIZE)].entries[i % SECOND_LEVEL_TABLE_SIZE].bits;
                         }
+                        printf("FOR PAGE %d ENTRY: 0x%x",i,entry);
                         // valid
                         if (entry >> 15 == 1)
                         {
@@ -466,9 +467,14 @@ int main(int argc, char *argv[])
                     unsigned int pi = 0;
                     if (current != NULL)
                     {
+                        int loop = 0;
                         int found = 0;
                         do
                         {
+                            if(current == NULL) {
+                                current = clockList.head;
+                            }
+                            
                             pi = current->data;
                             unsigned int entry = 0x0000;
                             if (level == 1)
@@ -481,11 +487,13 @@ int main(int argc, char *argv[])
                             }
 
                             // check for valid, it supposed to be valid
+                            //printf("PI %d CLOCK ENTRY : 0x%x \n",pi,entry);
                             if (entry >> 15 == 1)
                             {
                                 // found
                                 if ((entry & R_MASK) >> 14 == 0)
                                 {
+                                    //printf("FOUND\n");
                                     found = 1;
                                     // remove from clockList
                                     removeFromList(&clockList, pi);
@@ -503,7 +511,7 @@ int main(int argc, char *argv[])
                                             fwrite(&c, sizeof(char), 1, disc);
                                         }
                                     }
-                                    printf("Page %d removed from RAM Frame %d\n", pi, recent);
+                                    printf("Page %d removed from RAM Frame %d\n", pi, ram_pointer);
 
                                     // reset page table entry
                                     if (level == 1)
@@ -524,32 +532,37 @@ int main(int argc, char *argv[])
                                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | V_MASK;
                                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
                                     pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits + ram_pointer;
-                                    printf("Page %d put into frame %d\n", pageIndex, ram_pointer);
+                                    printf("Page %d put into frame %d\n",  (pageIndex1 * SECOND_LEVEL_TABLE_SIZE)+ pageIndex, ram_pointer);
                                     break;
                                 }
                                 else // not found, set r bit to 0
                                 {
+                                    //printf("SETTING R BIT OF PI %d AND ENTRY 0x%x TO 0\n",pi,entry);
                                     if (level == 1)
                                     {
-                                        firstLevelPageTable.entries[pi].bits = entry & 0xBFF;
+                                        firstLevelPageTable.entries[pi].bits = entry & 0xBFFF;
                                     }
                                     else
                                     {
-                                        secondLevelPageTable.tables[(int)(pi / SECOND_LEVEL_TABLE_SIZE)].entries[pi % SECOND_LEVEL_TABLE_SIZE].bits = entry & 0xBFF;
+                                        secondLevelPageTable.tables[(int)(pi / SECOND_LEVEL_TABLE_SIZE)].entries[pi % SECOND_LEVEL_TABLE_SIZE].bits = entry & 0xBFFF;
                                     }
                                 }
                             }
 
                             current = current->next;
-                        } while (found == 0);
+                        } while (found == 0 );
+                        //printf("CLOCK LOOP ENDED");
                     }
+                    //printf("NULL HEAD");
                 }
                 else
                 {
+                    printf("UNIMPLEMENTED\n");
                 }
             }
         }
 
+        pageTable->entries[pageIndex].bits = pageTable->entries[pageIndex].bits | R_MASK;
         unsigned int ram_i = pageTable->entries[pageIndex].bits & ((int)pow(2, k_lsb) - 1);
         unsigned int offset = virtualAddress & 0x3F;
         char offsetValue = ram.data[ram_i].chars[offset];
@@ -598,6 +611,7 @@ int main(int argc, char *argv[])
             {
                 addToTail(&clockList, pageIndex1 * SECOND_LEVEL_TABLE_SIZE + pageIndex);
             }
+
         }
 
         // to do reminder: kısalt
@@ -627,52 +641,35 @@ int main(int argc, char *argv[])
     }
 
     fprintf(output, "Page Fault No: %d", totalPageFault);
-    if (level == 1)
+   
+    for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
     {
 
-        for (int i = 0; i < VIRTUAL_MEMORY_SIZE; i++)
+        unsigned int entry;
+        if(level == 1) {
+            entry = firstLevelPageTable.entries[i].bits;
+
+        }else{
+            entry = secondLevelPageTable.tables[(int)(i/32)].entries[i%32].bits;
+        }
+        // printf("entry: 0x%x, first bit: %d\n",entry,(firstLevelPageTable.entries[i].bits >> 15));
+
+        // if entry valid and in ram
+        if (entry >> 15 != 0)
         {
+            unsigned int ram_i = entry & ((int)pow(2, k_lsb) - 1);
+            fseek(disc, i * PAGE_SIZE, SEEK_SET);
 
-            unsigned int entry = firstLevelPageTable.entries[i].bits;
-            // printf("entry: 0x%x, first bit: %d\n",entry,(firstLevelPageTable.entries[i].bits >> 15));
-
-            // if entry valid and in ram
-            if (((int)firstLevelPageTable.entries[i].bits) >> 15 != 0)
+            for (int k = 0; k < PAGE_SIZE; k++)
             {
-                unsigned int ram_i = entry & ((int)pow(2, k_lsb) - 1);
-                fseek(disc, i * PAGE_SIZE, SEEK_SET);
-
-                for (int k = 0; k < PAGE_SIZE; k++)
-                {
-                    unsigned char c = ram.data[ram_i].chars[k];
-                    // printf("wroting to file 0x%hhx\n",c);
-                    fwrite(&c, sizeof(char), 1, disc);
-                }
+                unsigned char c = ram.data[ram_i].chars[k];
+                // printf("wroting to file 0x%hhx\n",c);
+                fwrite(&c, sizeof(char), 1, disc);
             }
         }
     }
-    else
-    {
-        for (int i = 0; i < SECOND_LEVEL_TABLE_SIZE; i++)
-        {
-            for (int j = 0; j < SECOND_LEVEL_TABLE_SIZE; j++)
-            {
-                unsigned int entry = secondLevelPageTable.tables[i].entries[j].bits;
-                if (((int)firstLevelPageTable.entries[i].bits) >> 15 != 0)
-                {
-                    unsigned int ram_i = entry & ((int)pow(2, k_lsb) - 1);
-                    fseek(disc, (i * SECOND_LEVEL_TABLE_SIZE + j) * PAGE_SIZE, SEEK_SET);
-
-                    for (int k = 0; k < PAGE_SIZE; k++)
-                    {
-                        unsigned char c = ram.data[ram_i].chars[k];
-                        // printf("wroting to file 0x%hhx\n",c);
-                        fwrite(&c, sizeof(char), 1, disc);
-                    }
-                }
-            }
-        }
-    }
+    
+    
 
     free(ram.data);
     ram.data = 0;

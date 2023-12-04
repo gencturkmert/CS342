@@ -5,9 +5,10 @@ LEVEL=2
 ADDRFILE="addr.txt"
 SWAPFILE="swapfile.bin"
 FCOUNT=4
-ALGO="LRU"
+ALGO="CLOCK"
 TICK=100
 OUTFILE="output.txt"
 
 # Run memsim with the specified parameters
 ./memsim -p $LEVEL -r $ADDRFILE -s $SWAPFILE -f $FCOUNT -a $ALGO -t $TICK -o $OUTFILE
+xxd -c 64 -g 1 swapfile.bin > swap.txt
