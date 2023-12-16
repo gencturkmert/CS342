@@ -1,6 +1,6 @@
 #ifndef SHARED_DEFS_H
 #define SHARED_DEFS_H
-
+#include <string.h>
 #define MAX_FILENAME 30 
 #define DIR_ENTRY_SIZE 128
 #define SUPERBLOCK_INDEX 0
@@ -8,6 +8,8 @@
 #define FAT_SIZE 32
 #define MAX_FAT_SIZE 16384
 #define FAT_ENTRIES_PER_BLOCK 512
+#define MAX_DISK_SIZE 23
+#define MIN_DISK_SIZE 18
 #define DIR_START_INDEX 33
 #define DIR_BLOCK_SIZE 8
 #define DIR_BLOCK_ENTRY_COUNT 16

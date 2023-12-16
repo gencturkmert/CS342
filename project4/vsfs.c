@@ -63,6 +63,10 @@ int write_block (void *block, int k)
 // this function is partially implemented.
 int vsformat (char *vdiskname, unsigned int m)
 {
+
+    if(m > MAX_DISK_SIZE || m < MIN_DISK_SIZE) {
+        printf("Disksize must be between %d and %d\n",MIN_DISK_SIZE,MAX_DISK_SIZE);
+    }
     char command[1000];
     int size;
     int num = 1;
@@ -92,14 +96,13 @@ int  vsmount (char *vdiskname)
     // vs_fd is global; hence other function can use it. 
     vs_fd = open(vdiskname, O_RDWR);
 
-    if (read_block(&superblock, 0) == -1) {
+    if (read_block(&superBlock, 0) == -1) {
         close(vs_fd);
         printf("Error reading superblock, virtual disk closed\n");
         return -1;
     }
 
-    fatTable = initFatTable();
-    fatBlockTable = initFatBlockTable();
+
     for (int i = 0; i < FAT_SIZE; ++i) {
         struct FatBlock fatblock;
         if (read_block(&fatblock, FAT_START_INDEX + i) == -1) { // Assuming FAT blocks start from block 1
@@ -108,7 +111,7 @@ int  vsmount (char *vdiskname)
             return -1;
         }
 
-        fatBlockTable[i] = fatblock;
+        fatBlockTable.blocks[i] = fatblock;
 
         for (int j = 0; j < FAT_ENTRIES_PER_BLOCK; ++j) {
             fatTable.entries[i * FAT_ENTRIES_PER_BLOCK + j] = fatblock.array[j];
@@ -120,7 +123,7 @@ int  vsmount (char *vdiskname)
         struct DirBlock dirBlock;
         if (read_block(&dirBlock, DIR_START_INDEX + i) == -1) {
             close(vs_fd);
-            perror("Error reading directory block %d, closing virtual disk\n",i);
+            printf("Error reading directory block %d, closing virtual disk\n",i);
             return -1;
         }
 
@@ -137,20 +140,20 @@ int  vsmount (char *vdiskname)
 int vsumount() {
 
     if (write_block(&superBlock, 0) == -1) {
-        perror("Error writing superblock\n");
+        printf("Error writing superblock\n");
         return -1;
     }
 
     for (int i = 0; i < FAT_SIZE; ++i) {
         if (write_block(&(fatBlockTable.blocks[i]), FAT_START_INDEX + i) == -1) {
-            perror("Error writing FAT block\n");
+            printf("Error writing FAT block\n");
             return -1;
         }
     }
 
     for (int i = 0; i < DIR_BLOCK_SIZE; ++i) {
         if (write_block(&dirTable.entries[i], DIR_START_INDEX + i) == -1) {
-            perror("Error writing directory block\n");
+            printf("Error writing directory block\n");
             return -1;
         }
     }
@@ -184,7 +187,7 @@ int vsclose(int fd){
 int vssize (int  fd)
 {
     int dirIndex = oftTable.entries[fd].dirIndex;
-    struct DirEntry entry =  dirTable[dirIndex / DIR_BLOCK_ENTRY_COUNT].entries[dirIndex % DIR_BLOCK_ENTRY_COUNT];
+    struct DirEntry entry =  dirTable.entries[dirIndex / DIR_BLOCK_ENTRY_COUNT].entries[dirIndex % DIR_BLOCK_ENTRY_COUNT];
     return entry.file_size;
 }
 
