@@ -1,6 +1,8 @@
 #ifndef SHARED_DEFS_H
 #define SHARED_DEFS_H
+
 #include <string.h>
+
 #define MAX_FILENAME 30 
 #define DIR_ENTRY_SIZE 128
 #define SUPERBLOCK_INDEX 0
@@ -30,14 +32,12 @@ struct DirEntry{
   int  file_size;
   int  first_block;
   
-  char dummy[ DIR_ENTRY_SIZE - sizeof(int)*2 - sizeof(char)*MAX_FILENAME ];
+  char dummy[ DIR_ENTRY_SIZE - sizeof(int)*3 - sizeof(char)*MAX_FILENAME ];
 };
 
 struct DirBlock{
     struct DirEntry entries[DIR_BLOCK_ENTRY_COUNT];
 };
-
-
 
 struct DirTable{
     struct DirBlock entries[DIR_BLOCK_SIZE];

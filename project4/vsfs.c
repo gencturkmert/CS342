@@ -73,10 +73,8 @@ int vsformat (char *vdiskname, unsigned int m)
     int count;
     size  = num << m;
     count = size / BLOCKSIZE;
-    //    printf ("%d %d", m, size);
     sprintf (command, "dd if=/dev/zero of=%s bs=%d count=%d",
              vdiskname, BLOCKSIZE, count);
-    //printf ("executing command = %s\n", command);
     system (command);
 
     if(vsmount(vdiskname) == 0 ) {
@@ -127,7 +125,6 @@ int  vsmount (char *vdiskname)
             return -1;
         }
 
-        // Copy entries from DirBlock to DirTable
         dirTable.entries[i] = dirBlock;
     }
 
@@ -171,7 +168,54 @@ int vsumount() {
 
 int vscreate(char *filename)
 {
-    return (0);
+    for (int i = 0; i < DIR_BLOCK_SIZE; ++i) {
+        for (int j = 0; j < DIR_BLOCK_ENTRY_COUNT; ++j) {
+            if (dirBlockTable.entries[i].entries[j].empty == 0) {
+
+
+                int found = 0;
+                int firstIndex = -1;
+                int secondIndex = -1;
+                for (int k = 0; k < FAT_SIZE; ++k) {
+                    for (int l = 0; l < FAT_ENTRIES_PER_BLOCK; ++l) {
+                 
+                        if (fatTable->blocks[k].array[l].empty == 0) {
+                            firstIndex = k;
+                            secondIndex = l;
+                           found = 1;
+                           break;
+                        }
+                    }
+
+                    if(found == 1) {
+                        break;
+                    }
+                }
+
+                if(found == 1) {
+                    struct DirEntry newFileEntry = dirBlockTable.entries[i].entries[j];
+                    newFileEntry.empty = 1;  
+                    strncpy(newFileEntry->name, filename, MAX_FILENAME);
+                    newFileEntry.file_size = 0;  
+                    newFileEntry.first_block = firstIndex * FAT_ENTRIES_PER_BLOCK + secondIndex;
+                    fatTable.blocks[firstIndex].array[secondIndex].next_block = -1;
+                    fatTable.blocks[firstIndex].array[secondIndex].empty = 1;
+                    dirBlockTable.entries[i].entries[j]=newFileEntry;
+                    dirTable.entries[i*DIR_BLOCK_SIZE+j] = newFileEntry;
+
+                    return 0;
+                }else{
+                    printf("There is no empty block for file\n");
+                    return 0;
+                }
+
+
+            }
+        }
+    }
+
+    printf("Error: No empty file slot available in the directory table.\n");
+    return -1;
 }
 
 
