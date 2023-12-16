@@ -116,7 +116,7 @@ int  vsmount (char *vdiskname)
 
     }
 
-    for (int i = 0; i < DIR_SIZE; ++i) {
+    for (int i = 0; i < DIR_BLOCK_SIZE; ++i) {
         struct DirBlock dirBlock;
         if (read_block(&dirBlock, DIR_START_INDEX + i) == -1) {
             close(vs_fd);
@@ -148,7 +148,7 @@ int vsumount() {
         }
     }
 
-    for (int i = 0; i < DIR_SIZE; ++i) {
+    for (int i = 0; i < DIR_BLOCK_SIZE; ++i) {
         if (write_block(&dirTable.entries[i], DIR_START_INDEX + i) == -1) {
             perror("Error writing directory block\n");
             return -1;
@@ -183,7 +183,9 @@ int vsclose(int fd){
 
 int vssize (int  fd)
 {
-    return (0); 
+    int dirIndex = oftTable.entries[fd].dirIndex;
+    struct DirEntry entry =  dirTable[dirIndex / DIR_BLOCK_ENTRY_COUNT].entries[dirIndex % DIR_BLOCK_ENTRY_COUNT];
+    return entry.file_size;
 }
 
 int vsread(int fd, void *buf, int n){

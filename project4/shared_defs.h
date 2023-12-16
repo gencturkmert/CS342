@@ -9,7 +9,8 @@
 #define MAX_FAT_SIZE 16384
 #define FAT_ENTRIES_PER_BLOCK 512
 #define DIR_START_INDEX 33
-#define DIR_SIZE 8
+#define DIR_BLOCK_SIZE 8
+#define DIR_BLOCK_ENTRY_COUNT 16
 #define DATA_BLOCKS_START 41
 #define MAX_DIR_COUNT 128
 #define MAX_DISK_SIZE 23
@@ -31,13 +32,13 @@ struct DirEntry{
 };
 
 struct DirBlock{
-    struct DirEntry entries[BLOCKSIZE/DIR_ENTRY_SIZE];
+    struct DirEntry entries[DIR_BLOCK_ENTRY_COUNT];
 };
 
 
 
 struct DirTable{
-    struct DirBlock entries[DIR_SIZE];
+    struct DirBlock entries[DIR_BLOCK_SIZE];
 };
 
 //4 bytes

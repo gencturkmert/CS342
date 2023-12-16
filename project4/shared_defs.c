@@ -31,7 +31,7 @@ struct DirBlock initDirBlock() {
 // Initialize a DirTable struct
 struct DirTable initDirTable() {
     struct DirTable dirTable;
-    for (int i = 0; i < DIR_SIZE; ++i) {
+    for (int i = 0; i < DIR_BLOCK_SIZE; ++i) {
         dirTable.entries[i] = initDirBlock();
     }
     return dirTable;
