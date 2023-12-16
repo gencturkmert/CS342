@@ -65,6 +65,8 @@ struct OftEntry{
 
     char filename[MAX_FILENAME];
     int dirIndex;
+    int currentBlock;
+    int currentOffset;
 };
 
 struct OFT{

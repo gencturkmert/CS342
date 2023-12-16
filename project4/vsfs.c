@@ -100,10 +100,14 @@ int  vsmount (char *vdiskname)
         return -1;
     }
 
+    oftTable = initOft();
+    fatTable = initFatTable();
+    fatBlockTable = initFatBlockTable();
+    dirTable = initDirTable();
 
     for (int i = 0; i < FAT_SIZE; ++i) {
         struct FatBlock fatblock;
-        if (read_block(&fatblock, FAT_START_INDEX + i) == -1) { // Assuming FAT blocks start from block 1
+        if (read_block(&fatblock, FAT_START_INDEX + i) == -1) {
             printf("Error reading FAT table block %d, closing virtual disk\n",i+1);
             close(vs_fd);
             return -1;
@@ -221,7 +225,33 @@ int vscreate(char *filename)
 
 int vsopen(char *file, int mode)
 {
-    return (0); 
+
+    for (int i = 0; i < DIR_BLOCK_SIZE; ++i) {
+        for (int j = 0; j < DIR_BLOCK_ENTRY_COUNT; ++j) {
+            if (dirTable.entries[i].entries[j].empty == 1 &&
+                strcmp(dirTable.entries[i].entries[j].name, file) == 0) {
+
+                    for (int k = 0; k < OPEN_FILE_TABLE_SIZE; ++k) {
+                        if (oftTable.entries[k].dirIndex == -1) {
+
+                            oftTable.entries[k].dirIndex = i * DIR_BLOCK_ENTRY_COUNT + j;
+                            strncpy(oftTable.entries[k].filename, file, MAX_FILENAME);
+                            oftTable.entries[k].currentBlock = dirTable.entries[i].entries[j].first_block;
+                            oftTable.entries[k].currentOffset = 0;
+
+                            return k;
+                        }
+                    }
+
+                    printf("There is no space in directory, file could not opened, close a file first\n");
+                    return -1;
+                    
+                }
+        }
+    }
+    
+    printf("File could not been found, create file first\n");
+    return -1;
 }
 
 int vsclose(int fd){
