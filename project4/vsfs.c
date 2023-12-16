@@ -16,6 +16,7 @@ int vs_fd; // file descriptor of the Linux file that acts as virtual disk.
 
 struct BLOCK superBlock;
 struct FatTable fatTable;
+struct FatBlockTable fatBlockTable;
 struct DirTable dirTable;
 struct OFT oftTable;
 
@@ -74,12 +75,12 @@ int vsformat (char *vdiskname, unsigned int m)
     //printf ("executing command = %s\n", command);
     system (command);
 
-    vsmount(vdiskname);
+    if(vsmount(vdiskname) == 0 ) {
+        printf("Disk formatted and mounted\n");
+        return( 0);
+    }
 
-    // now write the code to format the disk.
-    // .. your code...
-    
-    return (0); 
+    return (-1); 
 }
 
 
@@ -98,13 +99,17 @@ int  vsmount (char *vdiskname)
     }
 
     fatTable = initFatTable();
+    fatBlockTable = initFatBlockTable();
     for (int i = 0; i < FAT_SIZE; ++i) {
         struct FatBlock fatblock;
-        if (read_block(&fatblock, i + 1) == -1) { // Assuming FAT blocks start from block 1
+        if (read_block(&fatblock, FAT_START_INDEX + i) == -1) { // Assuming FAT blocks start from block 1
             printf("Error reading FAT table block %d, closing virtual disk\n",i+1);
             close(vs_fd);
             return -1;
         }
+
+        fatBlockTable[i] = fatblock;
+
         for (int j = 0; j < FAT_ENTRIES_PER_BLOCK; ++j) {
             fatTable.entries[i * FAT_ENTRIES_PER_BLOCK + j] = fatblock.array[j];
         }
@@ -123,21 +128,41 @@ int  vsmount (char *vdiskname)
         dirTable.entries[i] = dirBlock;
     }
 
-
+    printf("Virtual disk mounted\n");
     return(0);
 }
 
 
 // this function is partially implemented.
-int vsumount ()
-{
-    // write superblock to virtual disk file
-    // write FAT to virtual disk file
-    // write root directory to virtual disk file
+int vsumount() {
 
-    fsync (vs_fd); // synchronize kernel file cache with the disk
-    close (vs_fd);
-    return (0); 
+    if (write_block(&superBlock, 0) == -1) {
+        perror("Error writing superblock\n");
+        return -1;
+    }
+
+    for (int i = 0; i < FAT_SIZE; ++i) {
+        if (write_block(&(fatBlockTable.blocks[i]), FAT_START_INDEX + i) == -1) {
+            perror("Error writing FAT block\n");
+            return -1;
+        }
+    }
+
+    for (int i = 0; i < DIR_SIZE; ++i) {
+        if (write_block(&dirTable.entries[i], DIR_START_INDEX + i) == -1) {
+            perror("Error writing directory block\n");
+            return -1;
+        }
+    }
+
+    fsync(vs_fd);
+
+    if (close(vs_fd) == -1) {
+        perror("Error closing virtual disk\n");
+        return -1;
+    }
+
+    return 0;
 }
 
 

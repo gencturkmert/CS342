@@ -50,7 +50,9 @@ struct FatBlock{
     struct FatEntry array[ FAT_ENTRIES_PER_BLOCK];
 };
 
-
+struct FatBlockTable{
+    struct FatBlock blocks[FAT_SIZE];
+};
 
 struct FatTable{
     struct FatEntry entries[MAX_FAT_SIZE];
@@ -73,6 +75,7 @@ struct DirTable initDirTable();
 struct FatEntry initFatEntry();
 struct FatBlock initFatBlock();
 struct FatTable initFatTable();
+struct FatBlockTable initFatBlockTable();
 struct OftEntry initOftEntry();
 struct OFT initOft();
 

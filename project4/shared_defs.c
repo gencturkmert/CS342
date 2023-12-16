@@ -54,6 +54,15 @@ struct FatBlock initFatBlock() {
     return fatBlock;
 }
 
+struct FatBlockTable initFatBlockTable(){
+    struct FatBlockTable fatBlockTable;
+    for (int i = 0; i < FAT_SIZE; ++i) {
+        fatBlockTable.blocks[i] = initFatBlock();
+    }
+    return fatBlockTable;
+}
+
+
 // Initialize a FatTable struct
 struct FatTable initFatTable() {
     struct FatTable fatTable;
@@ -79,3 +88,4 @@ struct OFT initOft() {
     }
     return oft;
 }
+
