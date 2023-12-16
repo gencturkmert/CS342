@@ -1,21 +1,20 @@
-
-
-
 all: libvsfs.a create_format app
 
-libvsfs.a: 	vsfs.c
-	gcc -Wall -c vsfs.c
-	ar -cvq libvsfs.a vsfs.o
+libvsfs.a: vsfs.o shared_defs.o
+	ar -cvq libvsfs.a vsfs.o shared_defs.o
 	ranlib libvsfs.a
 
-create_format: create_format.c
-	gcc -Wall -o create_format  create_format.c   -L. -lvsfs
+create_format: create_format.c libvsfs.a
+	gcc -Wall -o create_format create_format.c -L. -lvsfs
 
-app: 	app.c
+app: app.c libvsfs.a
 	gcc -Wall -o app app.c -L. -lvsfs
 
-clean: 
-	rm *.o *~ libvsfs.a app create_format
+vsfs.o: vsfs.c shared_defs.h
+	gcc -Wall -c vsfs.c
 
-cleanall: 
-	rm *.o *~ libvsfs.a app vdisk create_format
+shared_defs.o: shared_defs.c shared_defs.h
+	gcc -Wall -c shared_defs.c
+
+clean:
+	rm -f *.o *~ libvsfs.a app create_format
