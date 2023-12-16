@@ -174,7 +174,7 @@ int vscreate(char *filename)
 {
     for (int i = 0; i < DIR_BLOCK_SIZE; ++i) {
         for (int j = 0; j < DIR_BLOCK_ENTRY_COUNT; ++j) {
-            if (dirBlockTable.entries[i].entries[j].empty == 0) {
+            if (dirTable.entries[i].entries[j].empty == 0) {
 
 
                 int found = 0;
@@ -183,7 +183,7 @@ int vscreate(char *filename)
                 for (int k = 0; k < FAT_SIZE; ++k) {
                     for (int l = 0; l < FAT_ENTRIES_PER_BLOCK; ++l) {
                  
-                        if (fatTable->blocks[k].array[l].empty == 0) {
+                        if (fatBlockTable.blocks[k].array[l].empty == 0) {
                             firstIndex = k;
                             secondIndex = l;
                            found = 1;
@@ -197,14 +197,14 @@ int vscreate(char *filename)
                 }
 
                 if(found == 1) {
-                    struct DirEntry newFileEntry = dirBlockTable.entries[i].entries[j];
+                    struct DirEntry newFileEntry = dirTable.entries[i].entries[j];
                     newFileEntry.empty = 1;  
-                    strncpy(newFileEntry->name, filename, MAX_FILENAME);
+                    strncpy(newFileEntry.name, filename, MAX_FILENAME);
                     newFileEntry.file_size = 0;  
                     newFileEntry.first_block = firstIndex * FAT_ENTRIES_PER_BLOCK + secondIndex;
-                    fatTable.blocks[firstIndex].array[secondIndex].next_block = -1;
-                    fatTable.blocks[firstIndex].array[secondIndex].empty = 1;
-                    dirBlockTable.entries[i].entries[j]=newFileEntry;
+                    fatBlockTable.blocks[firstIndex].array[secondIndex].next_block = -1;
+                    fatBlockTable.blocks[firstIndex].array[secondIndex].empty = 1;
+                    dirTable.entries[i].entries[j]=newFileEntry;
 
                     return 0;
                 }else{
@@ -257,8 +257,10 @@ int vsclose(int fd){
     if (fd >= 0 && fd < OPEN_FILE_TABLE_SIZE && oftTable.entries[fd].dirIndex != -1 ) {
         oftTable.entries[fd].dirIndex = -1;
         printf("File with descriptor %d closed successfully.\n", fd);
+        return 0;
     } else {
         printf("Error: Invalid file descriptor %d.\n", fd);
+        return -1;
     }
 }
 
