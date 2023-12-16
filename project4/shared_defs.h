@@ -71,6 +71,17 @@ struct OFT{
     struct OftEntry entries[16];
 };
 
+struct BLOCK initBlock();
+struct DirEntry initDirEntry();
+struct DirBlock initDirBlock();
+struct DirTableEntry initDirTableEntry();
+struct DirTable initDirTable();
+struct FatEntry initFatEntry();
+struct FatBlock initFatBlock();
+struct FatTable initFatTable();
+struct OftEntry initOftEntry();
+struct OFT initOft();
+
 #endif
 
 

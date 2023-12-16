@@ -1,4 +1,5 @@
 #include "shared_defs.h"
+
 // Initialize a BLOCK struct
 struct BLOCK initBlock() {
     struct BLOCK block;
