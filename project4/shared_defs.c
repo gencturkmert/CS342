@@ -27,21 +27,12 @@ struct DirBlock initDirBlock() {
     return dirBlock;
 }
 
-// Initialize a DirTableEntry struct
-struct DirTableEntry initDirTableEntry() {
-    struct DirTableEntry dirTableEntry;
-    dirTableEntry.empty = 0;
-    memset(dirTableEntry.name, 0, MAX_FILENAME);
-    dirTableEntry.file_size = 0;
-    dirTableEntry.first_block = 0;
-    return dirTableEntry;
-}
 
 // Initialize a DirTable struct
 struct DirTable initDirTable() {
     struct DirTable dirTable;
-    for (int i = 0; i < MAX_DIR_COUNT; ++i) {
-        dirTable.entries[i] = initDirTableEntry();
+    for (int i = 0; i < DIR_SIZE; ++i) {
+        dirTable.entries[i] = initDirBlock();
     }
     return dirTable;
 }

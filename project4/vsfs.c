@@ -14,6 +14,10 @@ int vs_fd; // file descriptor of the Linux file that acts as virtual disk.
               // this is not visible to an application.
 // ========================================================
 
+struct BLOCK superBlock;
+struct FatTable fatTable;
+struct DirTable dirTable;
+struct OFT oftTable;
 
 // read block k from disk (virtual disk) into buffer block.
 // size of the block is BLOCKSIZE.
@@ -70,6 +74,8 @@ int vsformat (char *vdiskname, unsigned int m)
     //printf ("executing command = %s\n", command);
     system (command);
 
+    vsmount(vdiskname);
+
     // now write the code to format the disk.
     // .. your code...
     
@@ -84,10 +90,40 @@ int  vsmount (char *vdiskname)
     // way make it ready to be used for other operations.
     // vs_fd is global; hence other function can use it. 
     vs_fd = open(vdiskname, O_RDWR);
-    // load (chache) the superblock info from disk (Linux file) into memory
-    // load the FAT table from disk into memory
-    // load root directory from disk into memory
-    //...
+
+    if (read_block(&superblock, 0) == -1) {
+        close(vs_fd);
+        printf("Error reading superblock, virtual disk closed\n");
+        return -1;
+    }
+
+    fatTable = initFatTable();
+    for (int i = 0; i < FAT_SIZE; ++i) {
+        struct FatBlock fatblock;
+        if (read_block(&fatblock, i + 1) == -1) { // Assuming FAT blocks start from block 1
+            printf("Error reading FAT table block %d, closing virtual disk\n",i+1);
+            close(vs_fd);
+            return -1;
+        }
+        for (int j = 0; j < FAT_ENTRIES_PER_BLOCK; ++j) {
+            fatTable.entries[i * FAT_ENTRIES_PER_BLOCK + j] = fatblock.array[j];
+        }
+
+    }
+
+    for (int i = 0; i < DIR_SIZE; ++i) {
+        struct DirBlock dirBlock;
+        if (read_block(&dirBlock, DIR_START_INDEX + i) == -1) {
+            close(vs_fd);
+            perror("Error reading directory block %d, closing virtual disk\n",i);
+            return -1;
+        }
+
+        // Copy entries from DirBlock to DirTable
+        dirTable.entries[i] = dirBlock;
+    }
+
+
     return(0);
 }
 
