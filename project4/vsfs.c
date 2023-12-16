@@ -205,7 +205,6 @@ int vscreate(char *filename)
                     fatTable.blocks[firstIndex].array[secondIndex].next_block = -1;
                     fatTable.blocks[firstIndex].array[secondIndex].empty = 1;
                     dirBlockTable.entries[i].entries[j]=newFileEntry;
-                    dirTable.entries[i*DIR_BLOCK_SIZE+j] = newFileEntry;
 
                     return 0;
                 }else{
@@ -243,7 +242,7 @@ int vsopen(char *file, int mode)
                         }
                     }
 
-                    printf("There is no space in directory, file could not opened, close a file first\n");
+                    printf("There should be maximum 16 files opened, file could not opened, close a file first\n");
                     return -1;
                     
                 }
@@ -255,7 +254,12 @@ int vsopen(char *file, int mode)
 }
 
 int vsclose(int fd){
-    return (0); 
+    if (fd >= 0 && fd < OPEN_FILE_TABLE_SIZE && oftTable.entries[fd].dirIndex != -1 ) {
+        oftTable.entries[fd].dirIndex = -1;
+        printf("File with descriptor %d closed successfully.\n", fd);
+    } else {
+        printf("Error: Invalid file descriptor %d.\n", fd);
+    }
 }
 
 int vssize (int  fd)
