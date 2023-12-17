@@ -39,6 +39,21 @@ int read_block (void *block, int k)
     return (0); 
 }
 
+int read_block_offset (void *block, int k, int o, int size)
+{
+    int n;
+    int offset;
+
+    offset = k * BLOCKSIZE + o;
+    lseek(vs_fd, (off_t) offset, SEEK_SET);
+    n = read (vs_fd, block, size);
+    if (n != size) {
+	printf ("read error\n");
+	return -1;
+    }
+    return (0); 
+}
+
 // write block k into the virtual disk. 
 int write_block (void *block, int k)
 {
@@ -51,6 +66,22 @@ int write_block (void *block, int k)
     if (n != BLOCKSIZE) {
 	printf ("write error\n");
 	return (-1);
+    }
+    return 0; 
+}
+
+int write_block_offset (void *block, int k, int o, int size)
+{
+    int n;
+    int offset;
+
+    offset = k * BLOCKSIZE + o;
+    lseek(vs_fd, (off_t) offset, SEEK_SET);
+    n = write (vs_fd, block, size);
+
+    if(n != size) {
+        printf("Write error o\n");
+        return -1;
     }
     return 0; 
 }
@@ -176,42 +207,21 @@ int vscreate(char *filename)
         for (int j = 0; j < DIR_BLOCK_ENTRY_COUNT; ++j) {
             if (dirTable.entries[i].entries[j].empty == 0) {
 
+                int newBlock = allocateNewBlock(-1);
 
-                int found = 0;
-                int firstIndex = -1;
-                int secondIndex = -1;
-                for (int k = 0; k < FAT_SIZE; ++k) {
-                    for (int l = 0; l < FAT_ENTRIES_PER_BLOCK; ++l) {
-                 
-                        if (fatBlockTable.blocks[k].array[l].empty == 0) {
-                            firstIndex = k;
-                            secondIndex = l;
-                           found = 1;
-                           break;
-                        }
-                    }
-
-                    if(found == 1) {
-                        break;
-                    }
-                }
-
-                if(found == 1) {
-                    struct DirEntry newFileEntry = dirTable.entries[i].entries[j];
+                if(newBlock != -1) {
+                    struct DirEntry newFileEntry = dirBlockTable.entries[i].entries[j];
                     newFileEntry.empty = 1;  
                     strncpy(newFileEntry.name, filename, MAX_FILENAME);
                     newFileEntry.file_size = 0;  
-                    newFileEntry.first_block = firstIndex * FAT_ENTRIES_PER_BLOCK + secondIndex;
-                    fatBlockTable.blocks[firstIndex].array[secondIndex].next_block = -1;
-                    fatBlockTable.blocks[firstIndex].array[secondIndex].empty = 1;
-                    dirTable.entries[i].entries[j]=newFileEntry;
+                    newFileEntry.first_block = newBlock;
+                    dirBlockTable.entries[i].entries[j]=newFileEntry;
 
                     return 0;
                 }else{
                     printf("There is no empty block for file\n");
                     return 0;
                 }
-
 
             }
         }
@@ -237,6 +247,7 @@ int vsopen(char *file, int mode)
                             strncpy(oftTable.entries[k].filename, file, MAX_FILENAME);
                             oftTable.entries[k].currentBlock = dirTable.entries[i].entries[j].first_block;
                             oftTable.entries[k].currentOffset = 0;
+                            oftTable.mode = mode;
 
                             return k;
                         }
@@ -271,18 +282,173 @@ int vssize (int  fd)
     return entry.file_size;
 }
 
-int vsread(int fd, void *buf, int n){
-    return (0); 
-}
+int vsread(int fd, void *buf, int n)
+{
+    struct OftEntry oftEntry = oftTable.entries[fd];
+
+    if(oftEntry.dirIndex == -1) {
+        printf("Error in file read, file is not found in oft\n");
+        return -1;
+    }
+
+    if(oftEntry.mode == MODE_APPEND) {
+        printf("File is opened in append mode, can't read values\n");
+        return -1;
+    }
+
+    if(n>BLOCKSIZE) {
+        printf("Maximum %d bytes can be read in single call\n",BLOCKSIZE);
+    }
+
+    
+
+    int remainingSpace = BLOCKSIZE - oftEntry.currentOffset;
+
+    if(remainingSpace > n) {
+        read_block_offset(buf,oftEntry.currentBlock,oftEntry.currentOffset,n);
+    }else{
+        void *nextBuf = buf;
+        if(remainingSpace != 0) {
+            read_block_offset(buf, oftEntry.currentBlock, oftEntry.currentOffset, remainingSpace);
+           nextBuf =  (void*)((char*)buf + remainingSpace)
+            n = n - remainingSpace;
+        }
+
+        int newBlockIndex = getNextBlock(oftEntry.currentBlock);
+        if (newBlockIndex == -1) {
+            printf("Error: Unable to read next block. File ended\n");
+            return -1;
+        }
+
+        oftEntry.currentBlock = newBlockIndex;
+        
+        read_block_offset(nextBuf, oftEntry.currentBlock, oftEntry.currentOffset, n);
+          
+    }
+
+    oftTable.entries[fd] = oftEntry;
+
+    return 0;
+    }
 
 
 int vsappend(int fd, void *buf, int n)
+
 {
-    return (0); 
+    struct OftEntry oftEntry = oftTable.entries[fd];
+    if(oftEntry.dirIndex == -1) {
+        printf("Error in file append, file is not found in oft\n");
+        return -1;
+    }
+
+    if(oftEntry.mode == MODE_READ) {
+        printf("File is opened in read mode, can't append values\n");
+        return -1;
+    }
+
+    if(n>BLOCKSIZE) {
+        printf("Maximum %d bytes can be written in single call\n",BLOCKSIZE);
+    }
+
+    int remainingSpace = BLOCKSIZE - oftEntry.currentOffset;
+
+    if(remainingSpace > n) {
+        write_block_offset(buf,oftEntry.currentBlock,oftEntry.currentOffset,n);
+    }else{
+        if(remainingSpace != 0) {
+            write_block_offset(buf, oftEntry.currentBlock, oftEntry.currentOffset, remainingSpace);
+           *buf =  (void*)((char*)buf + remainingSpace)
+            n = n - remainingSpace;
+        }
+
+        int newBlockIndex = allocateNewBlock(oftEntry.currentBlock);
+        if (newBlockIndex == -1) {
+            printf("Error: Unable to allocate a new block.\n");
+            return -1;
+        }
+
+        oftEntry.currentBlock = newBlockIndex;
+        
+        write_block_offset(buf, oftEntry.currentBlock, oftEntry.currentOffset, n);
+          
+    }
+
+    oftTable.entries[fd] = oftEntry;
+
+    dirTable.entries[oftEntry.dirIndex/DIR_BLOCK_ENTRY_COUNT].entries[oftEntry.dirIndex%DIR_BLOCK_ENTRY_COUNT].file_size += n;
+
+    return 0;
+
 }
 
 int vsdelete(char *filename)
 {
-    return (0); 
+
+     for (int i = 0; i < DIR_BLOCK_SIZE; ++i) {
+        for (int j = 0; j < DIR_BLOCK_ENTRY_COUNT; ++j) {
+            if (dirTable.entries[i].entries[j].empty == 1 &&
+                strcmp(dirTable.entries[i].entries[j].name, filename) == 0) {
+
+                    for (int k = 0; k < OPEN_FILE_TABLE_SIZE; ++k) {
+                        if (strcmp(oftTable.entries[k].name, filename) == 0) {
+
+                            oftTable.entries[k].dirIndex = -1;;
+                            oftTable.entries[k].currentBlock = -1;
+                            oftTable.entries[k].currentOffset = 0;
+                            oftTable.mode = -1;
+
+                            
+                        }
+                    }
+
+                    dirTable.entries[i].entries[j].empty = 0;
+                    dirTable.entries[i].entries[j].file_size = 0;
+                    deleteBlock(dirTable.entries[i].entries[j].first_block);
+                    dirTable.entries[i].entries[j].first_block = -1;
+                    printf("File deleted \n");
+                    return 0;
+                    
+                }
+        }
+    }
+    
+    printf("File could not been found, create file first\n");
+    return -1;
+}
+
+int deleteBlock(int currIndex) {
+    int nextIndex = fatBlockTable.blocks[currIndex/FAT_ENTRIES_PER_BLOCK].array[currIndex%FAT_ENTRIES_PER_BLOCK].next_block;
+    fatBlockTable.blocks[currIndex/FAT_ENTRIES_PER_BLOCK].array[currIndex%FAT_ENTRIES_PER_BLOCK].empty = 0;
+    fatBlockTable.blocks[currIndex/FAT_ENTRIES_PER_BLOCK].array[currIndex%FAT_ENTRIES_PER_BLOCK].next_block = -1;
+    
+    if(nextIndex != -1) {
+        deleteBlock(nextIndex);
+    }
+
+    return 0;
+}
+
+int allocateNewBlock(int prevBlockIndex) {
+    for (int i = 0; i < FAT_SIZE; ++i) {
+        for (int j = 0; j < FAT_ENTRIES_PER_BLOCK; ++j) {
+            if (fatBlockTable.blocks[i].array[j].empty == 0) {
+                fatBlockTable.blocks[i].array[j].empty = 1;
+                fatBlockTable.blocks[i].array[j].next_block = -1; 
+
+                if(prevBlockIndex != -1) {
+                    fatBlockTable.blocks[prevBlockIndex/FAT_ENTRIES_PER_BLOCK].array[prevBlockIndex%FAT_ENTRIES_PER_BLOCK] = i * FAT_ENTRIES_PER_BLOCK + j;
+                }
+                return i * FAT_ENTRIES_PER_BLOCK + j;
+            }
+        }
+    }
+
+    printf("No empty block found in fat table\n");
+    return -1;
+}
+
+int getNextBlock(int currentBlock) {
+    int nextIndex = fatBlockTable.blocks[currentBlock/FAT_ENTRIES_PER_BLOCK].array[currentBlock%FAT_ENTRIES_PER_BLOCK].next_block;
+    return nextIndex;
 }
 

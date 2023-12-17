@@ -67,6 +67,7 @@ struct OftEntry{
     int dirIndex;
     int currentBlock;
     int currentOffset;
+    int mode;
 };
 
 struct OFT{

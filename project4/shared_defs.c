@@ -77,6 +77,7 @@ struct OftEntry initOftEntry() {
     struct OftEntry oftEntry;
     memset(oftEntry.filename, 0, MAX_FILENAME);
     oftEntry.dirIndex = -1;
+    oftEntry.mode = -1;
     return oftEntry;
 }
 
