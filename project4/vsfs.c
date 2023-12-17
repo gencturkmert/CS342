@@ -48,7 +48,7 @@ int read_block_offset (void *block, int k, int o, int size)
     lseek(vs_fd, (off_t) offset, SEEK_SET);
     n = read (vs_fd, block, size);
     if (n != size) {
-	printf ("read error\n");
+	printf ("read error while reading offset\n");
 	return -1;
     }
     return (0); 
@@ -210,17 +210,18 @@ int vscreate(char *filename)
                 int newBlock = allocateNewBlock(-1);
 
                 if(newBlock != -1) {
-                    struct DirEntry newFileEntry = dirBlockTable.entries[i].entries[j];
+                    struct DirEntry newFileEntry = dirTable.entries[i].entries[j];
                     newFileEntry.empty = 1;  
                     strncpy(newFileEntry.name, filename, MAX_FILENAME);
                     newFileEntry.file_size = 0;  
                     newFileEntry.first_block = newBlock;
-                    dirBlockTable.entries[i].entries[j]=newFileEntry;
+                    dirTable.entries[i].entries[j]=newFileEntry;
 
+                    printf("File %s created succesfully\n",filename);
                     return 0;
                 }else{
                     printf("There is no empty block for file\n");
-                    return 0;
+                    return -1;
                 }
 
             }
@@ -247,8 +248,9 @@ int vsopen(char *file, int mode)
                             strncpy(oftTable.entries[k].filename, file, MAX_FILENAME);
                             oftTable.entries[k].currentBlock = dirTable.entries[i].entries[j].first_block;
                             oftTable.entries[k].currentOffset = 0;
-                            oftTable.mode = mode;
+                            oftTable.entries[k].mode = mode;
 
+                            printf("File %s opened succesfully\n",file);
                             return k;
                         }
                     }
@@ -278,20 +280,20 @@ int vsclose(int fd){
 int vssize (int  fd)
 {
     int dirIndex = oftTable.entries[fd].dirIndex;
-    struct DirEntry entry =  dirTable.entries[dirIndex / DIR_BLOCK_ENTRY_COUNT].entries[dirIndex % DIR_BLOCK_ENTRY_COUNT];
-    return entry.file_size;
+    return dirTable.entries[dirIndex / DIR_BLOCK_ENTRY_COUNT].entries[dirIndex % DIR_BLOCK_ENTRY_COUNT].file_size;
+    
 }
 
 int vsread(int fd, void *buf, int n)
 {
-    struct OftEntry oftEntry = oftTable.entries[fd];
+    struct OftEntry* oftEntry = &oftTable.entries[fd];
 
-    if(oftEntry.dirIndex == -1) {
+    if(oftEntry->dirIndex == -1) {
         printf("Error in file read, file is not found in oft\n");
         return -1;
     }
 
-    if(oftEntry.mode == MODE_APPEND) {
+    if(oftEntry->mode == MODE_APPEND) {
         printf("File is opened in append mode, can't read values\n");
         return -1;
     }
@@ -302,31 +304,33 @@ int vsread(int fd, void *buf, int n)
 
     
 
-    int remainingSpace = BLOCKSIZE - oftEntry.currentOffset;
+    int remainingSpace = BLOCKSIZE - oftEntry->currentOffset;
 
     if(remainingSpace > n) {
-        read_block_offset(buf,oftEntry.currentBlock,oftEntry.currentOffset,n);
+        read_block_offset(buf,oftEntry->currentBlock,oftEntry->currentOffset,n);
+        oftEntry->currentOffset += n;
     }else{
         void *nextBuf = buf;
         if(remainingSpace != 0) {
-            read_block_offset(buf, oftEntry.currentBlock, oftEntry.currentOffset, remainingSpace);
-           nextBuf =  (void*)((char*)buf + remainingSpace)
+            read_block_offset(buf, oftEntry->currentBlock, oftEntry->currentOffset, remainingSpace);
+            nextBuf =  (void*)((char*)buf + remainingSpace);
             n = n - remainingSpace;
+            oftEntry->currentOffset = 0;
         }
 
-        int newBlockIndex = getNextBlock(oftEntry.currentBlock);
+        int newBlockIndex = getNextBlock(oftEntry->currentBlock);
         if (newBlockIndex == -1) {
             printf("Error: Unable to read next block. File ended\n");
             return -1;
         }
 
-        oftEntry.currentBlock = newBlockIndex;
+        oftEntry->currentBlock = newBlockIndex;
         
-        read_block_offset(nextBuf, oftEntry.currentBlock, oftEntry.currentOffset, n);
+        read_block_offset(nextBuf, oftEntry->currentBlock, oftEntry->currentOffset, n);
+        oftEntry->currentOffset += n;
           
     }
 
-    oftTable.entries[fd] = oftEntry;
 
     return 0;
     }
@@ -335,47 +339,52 @@ int vsread(int fd, void *buf, int n)
 int vsappend(int fd, void *buf, int n)
 
 {
-    struct OftEntry oftEntry = oftTable.entries[fd];
-    if(oftEntry.dirIndex == -1) {
+    struct OftEntry* oftEntry = &oftTable.entries[fd];
+    if(oftEntry->dirIndex == -1) {
         printf("Error in file append, file is not found in oft\n");
         return -1;
     }
 
-    if(oftEntry.mode == MODE_READ) {
+    if(oftEntry->mode == MODE_READ) {
         printf("File is opened in read mode, can't append values\n");
         return -1;
     }
 
     if(n>BLOCKSIZE) {
         printf("Maximum %d bytes can be written in single call\n",BLOCKSIZE);
+        return -1;
     }
 
-    int remainingSpace = BLOCKSIZE - oftEntry.currentOffset;
+    int remainingSpace = BLOCKSIZE - oftEntry->currentOffset;
+    //printf("Remaining space is %d\n",remainingSpace);
 
     if(remainingSpace > n) {
-        write_block_offset(buf,oftEntry.currentBlock,oftEntry.currentOffset,n);
+        write_block_offset(buf,oftEntry->currentBlock,oftEntry->currentOffset,n);
+        oftEntry->currentOffset += n;
     }else{
         if(remainingSpace != 0) {
-            write_block_offset(buf, oftEntry.currentBlock, oftEntry.currentOffset, remainingSpace);
-           *buf =  (void*)((char*)buf + remainingSpace)
+            write_block_offset(buf, oftEntry->currentBlock, oftEntry->currentOffset, remainingSpace);
+            buf =  (void*)((char*)buf + remainingSpace);
             n = n - remainingSpace;
+            oftEntry->currentOffset = 0;
         }
 
-        int newBlockIndex = allocateNewBlock(oftEntry.currentBlock);
+        int newBlockIndex = allocateNewBlock(oftEntry->currentBlock);
         if (newBlockIndex == -1) {
             printf("Error: Unable to allocate a new block.\n");
             return -1;
         }
 
-        oftEntry.currentBlock = newBlockIndex;
+        oftEntry->currentBlock = newBlockIndex;
         
-        write_block_offset(buf, oftEntry.currentBlock, oftEntry.currentOffset, n);
+        write_block_offset(buf, oftEntry->currentBlock, oftEntry->currentOffset, n);
+        oftEntry->currentOffset += n;
           
     }
 
-    oftTable.entries[fd] = oftEntry;
 
-    dirTable.entries[oftEntry.dirIndex/DIR_BLOCK_ENTRY_COUNT].entries[oftEntry.dirIndex%DIR_BLOCK_ENTRY_COUNT].file_size += n;
+    dirTable.entries[oftEntry->dirIndex/DIR_BLOCK_ENTRY_COUNT].entries[oftEntry->dirIndex%DIR_BLOCK_ENTRY_COUNT].file_size += n;
+    //printf("File size incremented %d\n",dirTable.entries[oftEntry->dirIndex/DIR_BLOCK_ENTRY_COUNT].entries[oftEntry->dirIndex%DIR_BLOCK_ENTRY_COUNT].file_size);
 
     return 0;
 
@@ -390,12 +399,12 @@ int vsdelete(char *filename)
                 strcmp(dirTable.entries[i].entries[j].name, filename) == 0) {
 
                     for (int k = 0; k < OPEN_FILE_TABLE_SIZE; ++k) {
-                        if (strcmp(oftTable.entries[k].name, filename) == 0) {
+                        if (strcmp(oftTable.entries[k].filename, filename) == 0) {
 
                             oftTable.entries[k].dirIndex = -1;;
                             oftTable.entries[k].currentBlock = -1;
                             oftTable.entries[k].currentOffset = 0;
-                            oftTable.mode = -1;
+                            oftTable.entries[k].mode = -1;
 
                             
                         }
@@ -436,8 +445,9 @@ int allocateNewBlock(int prevBlockIndex) {
                 fatBlockTable.blocks[i].array[j].next_block = -1; 
 
                 if(prevBlockIndex != -1) {
-                    fatBlockTable.blocks[prevBlockIndex/FAT_ENTRIES_PER_BLOCK].array[prevBlockIndex%FAT_ENTRIES_PER_BLOCK] = i * FAT_ENTRIES_PER_BLOCK + j;
+                    fatBlockTable.blocks[prevBlockIndex/FAT_ENTRIES_PER_BLOCK].array[prevBlockIndex%FAT_ENTRIES_PER_BLOCK].next_block = i * FAT_ENTRIES_PER_BLOCK + j;
                 }
+                printf("Block %d allocated\n",i * FAT_ENTRIES_PER_BLOCK + j);
                 return i * FAT_ENTRIES_PER_BLOCK + j;
             }
         }

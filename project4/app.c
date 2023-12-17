@@ -29,13 +29,17 @@ int main(int argc, char **argv)
         exit (1);
     }
 
-    printf ("creating files\n"); 
-    vscreate ("file1.bin");
-    vscreate ("file2.bin");
-    vscreate ("file3.bin");
+ 
 
+
+    vscreate("file1.bin");
+    vscreate("file2.bin");
+    vscreate("file3.bin");
     fd1 = vsopen ("file1.bin", MODE_APPEND);
     fd2 = vsopen ("file2.bin", MODE_APPEND);
+    fd = vsopen("file3.bin", MODE_APPEND);
+    size = vssize (fd);
+    printf("File 3 size is %d\n",size);
     for (i = 0; i < 10000; ++i) {
         buffer[0] =   (char) 65;
         vsappend (fd1, (void *) buffer, 1);
@@ -48,23 +52,28 @@ int main(int argc, char **argv)
         buffer[3] = (char) 68;
         vsappend(fd2, (void *) buffer, 4);
     }
+
+    printf("File 1 size is %d\n",vssize(fd1)); 
+    printf("File 2 size is %d\n",vssize(fd2));
     
     vsclose(fd1);
     vsclose(fd2);
 
-    fd = vsopen("file3.bin", MODE_APPEND);
     for (i = 0; i < 1000; ++i) {
         memcpy (buffer, buffer2, 8); // just to show memcpy
         vsappend(fd, (void *) buffer, 8);
     }
+
     vsclose (fd);
 
     fd = vsopen("file3.bin", MODE_READ);
     size = vssize (fd);
+    printf("File 3 size is %d\n",size);
     for (i = 0; i < size; ++i) {
         vsread (fd, (void *) buffer, 1);
         c = (char) buffer[0];
         c = c + 1; // just to do something
+        //printf("Value %s read from file file3.bin\n",&c);
     }
     vsclose (fd);
     
