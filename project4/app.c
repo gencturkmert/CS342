@@ -11,7 +11,7 @@ int main(int argc, char **argv)
     int i;
     char c; 
     char buffer[2048];
-    char buffer2[8] = {50, 50, 50, 50, 50, 50, 50, 50};
+    char buffer2[8] = {50, 51, 52, 53, 54, 55, 56, 57};
     int size;
     char vdiskname[200]; 
 
@@ -40,7 +40,8 @@ int main(int argc, char **argv)
     fd = vsopen("file3.bin", MODE_APPEND);
     size = vssize (fd);
     printf("File 3 size is %d\n",size);
-    for (i = 0; i < 10000; ++i) {
+
+/*     for (i = 0; i < 10000; ++i) {
         buffer[0] =   (char) 65;
         vsappend (fd1, (void *) buffer, 1);
     }
@@ -54,7 +55,7 @@ int main(int argc, char **argv)
     }
 
     printf("File 1 size is %d\n",vssize(fd1)); 
-    printf("File 2 size is %d\n",vssize(fd2));
+    printf("File 2 size is %d\n",vssize(fd2)); */
     
     vsclose(fd1);
     vsclose(fd2);
@@ -63,6 +64,7 @@ int main(int argc, char **argv)
         memcpy (buffer, buffer2, 8); // just to show memcpy
         vsappend(fd, (void *) buffer, 8);
     }
+    
 
     vsclose (fd);
 
@@ -71,11 +73,11 @@ int main(int argc, char **argv)
     printf("File 3 size is %d\n",size);
     for (i = 0; i < size; ++i) {
         vsread (fd, (void *) buffer, 1);
-        c = (char) buffer[0];
-        c = c + 1; // just to do something
-        //printf("Value %s read from file file3.bin\n",&c);
+        c = (char*) buffer[0];
+        printf("Value %s read from file file3.bin\n",&c);
     }
     vsclose (fd);
+    vsdelete("file3.bin");
     
     ret = vsumount();
 }

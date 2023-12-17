@@ -48,7 +48,7 @@ int read_block_offset (void *block, int k, int o, int size)
     lseek(vs_fd, (off_t) offset, SEEK_SET);
     n = read (vs_fd, block, size);
     if (n != size) {
-	printf ("read error while reading offset\n");
+	printf ("read error while reading offset, size %d\n",n);
 	return -1;
     }
     return (0); 
@@ -250,6 +250,28 @@ int vsopen(char *file, int mode)
                             oftTable.entries[k].currentOffset = 0;
                             oftTable.entries[k].mode = mode;
 
+                            if(mode == MODE_APPEND) {
+                                if(dirTable.entries[i].entries[j].file_size >0) {
+                                    int size = dirTable.entries[i].entries[j].file_size;
+                                    int blockCount = size / BLOCKSIZE;
+                                    short lastBlock = dirTable.entries[i].entries[j].first_block;
+                                    while(blockCount != 0) {
+                                        int nextBlock = getNextBlock(lastBlock);
+
+                                        if(nextBlock == -1) {
+                                            break;
+                                        }
+
+                                        blockCount-=1;
+                                    }
+
+                                    oftTable.entries[k].currentBlock = lastBlock;
+                                    oftTable.entries[k].currentOffset = size % BLOCKSIZE;
+
+
+                                }
+                            }
+
                             printf("File %s opened succesfully\n",file);
                             return k;
                         }
@@ -300,6 +322,12 @@ int vsread(int fd, void *buf, int n)
 
     if(n>BLOCKSIZE) {
         printf("Maximum %d bytes can be read in single call\n",BLOCKSIZE);
+        return -1;
+    }
+
+    if(oftEntry->currentBlock == -1) {
+        printf("File ended\n");
+        return -1;
     }
 
     
@@ -319,21 +347,22 @@ int vsread(int fd, void *buf, int n)
         }
 
         int newBlockIndex = getNextBlock(oftEntry->currentBlock);
+        oftEntry->currentBlock = newBlockIndex;
         if (newBlockIndex == -1) {
             printf("Error: Unable to read next block. File ended\n");
             return -1;
         }
 
-        oftEntry->currentBlock = newBlockIndex;
         
         read_block_offset(nextBuf, oftEntry->currentBlock, oftEntry->currentOffset, n);
         oftEntry->currentOffset += n;
           
     }
+   // printf("Current offset %d\n",oftEntry->currentOffset);
 
 
     return 0;
-    }
+}
 
 
 int vsappend(int fd, void *buf, int n)
@@ -438,6 +467,7 @@ int deleteBlock(int currIndex) {
 }
 
 int allocateNewBlock(int prevBlockIndex) {
+    printf("prevBlockIndex %d",prevBlockIndex);
     for (int i = 0; i < FAT_SIZE; ++i) {
         for (int j = 0; j < FAT_ENTRIES_PER_BLOCK; ++j) {
             if (fatBlockTable.blocks[i].array[j].empty == 0) {
@@ -458,7 +488,13 @@ int allocateNewBlock(int prevBlockIndex) {
 }
 
 int getNextBlock(int currentBlock) {
+    printf("Current Block %d\n",currentBlock);
+    if(currentBlock/FAT_ENTRIES_PER_BLOCK > 32) {
+        return -1;
+    }
+
     int nextIndex = fatBlockTable.blocks[currentBlock/FAT_ENTRIES_PER_BLOCK].array[currentBlock%FAT_ENTRIES_PER_BLOCK].next_block;
+    printf("Next block %d\n",nextIndex);
     return nextIndex;
 }
 

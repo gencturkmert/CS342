@@ -45,8 +45,8 @@ struct DirTable{
 
 //4 bytes
 struct FatEntry {
-    unsigned short empty; //0 empty 1 full
-    unsigned short next_block;
+    short empty; //0 empty 1 full
+    short next_block;
 };
 
 struct FatBlock{
